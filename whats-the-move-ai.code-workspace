@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"name": "whats-the-move",
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.codeActionsOnSave": {
+			"source.fixAll": "explicit",
+			"source.organizeImports": "explicit",
+			"source.sortMembers": "explicit"
+		}
+	}
+}
