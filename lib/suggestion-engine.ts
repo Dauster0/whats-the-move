@@ -115,6 +115,14 @@ export function choosePrimaryIntents(
 
   if (
     maxMinutes >= 15 &&
+    preferences.interests.includes("hikes") &&
+    preferences.placeMode !== "indoors"
+  ) {
+    intents.push("outdoor_walk", "active_movement");
+  }
+
+  if (
+    maxMinutes >= 15 &&
     (preferences.interests.includes("coffee") ||
       preferences.interests.includes("dessert") ||
       preferences.interests.includes("cheap-hangouts"))
@@ -150,6 +158,19 @@ export function choosePrimaryIntents(
   }
 
   if (maxMinutes >= 45) intents.push("experience");
+
+  if (
+    maxMinutes >= 35 &&
+    (preferences.interests.includes("live-music") ||
+      preferences.interests.includes("concerts") ||
+      preferences.interests.includes("improv") ||
+      preferences.interests.includes("karaoke") ||
+      preferences.interests.includes("dancing") ||
+      preferences.interests.includes("trivia") ||
+      preferences.interests.includes("theater"))
+  ) {
+    intents.push("experience");
+  }
 
   if (intents.length === 0) {
     if (maxMinutes <= 10) intents.push("quick_reset");
@@ -393,6 +414,18 @@ function mapIntentToPlaceCategories(
   if (preferences.interests.includes("exploring")) categories.push("market", "gallery", "scenic");
   if (preferences.interests.includes("sports")) categories.push("bowling");
   if (preferences.interests.includes("cheap-hangouts")) categories.push("park", "market", "coffee");
+  if (preferences.interests.includes("hikes")) categories.push("park", "scenic");
+  if (preferences.interests.includes("live-music")) categories.push("live_music", "bar");
+  if (preferences.interests.includes("concerts")) categories.push("live_music", "bar", "nightclub");
+  if (preferences.interests.includes("improv")) categories.push("comedy");
+  if (preferences.interests.includes("karaoke")) categories.push("bar", "nightclub");
+  if (preferences.interests.includes("dancing")) categories.push("nightclub", "live_music");
+  if (preferences.interests.includes("trivia")) categories.push("bar", "restaurant");
+  if (preferences.interests.includes("theater")) categories.push("movie_theater", "comedy", "live_music");
+  if (preferences.interests.includes("farmers-markets")) categories.push("market");
+  if (preferences.interests.includes("rooftops")) categories.push("bar", "restaurant", "scenic");
+  if (preferences.interests.includes("bowling")) categories.push("bowling");
+  if (preferences.interests.includes("arcade")) categories.push("arcade");
 
   if (timeOfDay === "night") {
     categories.push(
@@ -420,9 +453,13 @@ function pickLiveEventCategories(context: SuggestionContext): LiveEventCategory[
   }
 
   if (context.preferences.interests.includes("comedy")) categories.push("comedy");
+  if (context.preferences.interests.includes("improv")) categories.push("comedy");
   if (context.preferences.interests.includes("nightlife")) categories.push("live_music");
+  if (context.preferences.interests.includes("live-music")) categories.push("live_music");
+  if (context.preferences.interests.includes("concerts")) categories.push("live_music", "sports_event");
   if (context.preferences.interests.includes("movies")) categories.push("movie_event");
   if (context.preferences.interests.includes("sports")) categories.push("sports_event");
+  if (context.preferences.interests.includes("theater")) categories.push("theater");
 
   return uniq(categories);
 }

@@ -9,27 +9,8 @@ import {
 } from "react-native";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import { font, radius, spacing } from "../lib/theme";
+import { USER_INTEREST_CHIPS } from "../lib/user-interests";
 import { UserPreferences, useMoveStore } from "../store/move-context";
-
-const INTERESTS = [
-  "walking",
-  "coffee",
-  "dessert",
-  "exploring",
-  "bookstores",
-  "museums",
-  "movies",
-  "comedy",
-  "nightlife",
-  "sports",
-  "working out",
-  "beach",
-  "journaling",
-  "reading",
-  "calling friends",
-  "solo-recharge",
-  "cheap-hangouts",
-];
 
 const STEPS = [
   "Find something to do in one tap.",
@@ -105,7 +86,7 @@ export default function OnboardingScreen() {
       {step === 0 && (
         <>
           <Text style={styles.subtitle}>
-            We'll find real places near you—cafes, comedy, parks & more. Skip to start finding, or pick interests for better suggestions.
+            Real places near you—cafes, comedy, parks, that kind of thing. Skip anytime, or pick a few interests so we’re less random.
           </Text>
         </>
       )}
@@ -113,21 +94,21 @@ export default function OnboardingScreen() {
       {step === 1 && (
         <>
           <Text style={styles.subtitle}>
-            Pick the things that actually feel like realistic yeses.
+            What would you actually say yes to this week?
           </Text>
           <View style={styles.chipGrid}>
-            {INTERESTS.map((item) => {
-              const active = preferences.interests.includes(item);
+            {USER_INTEREST_CHIPS.map(({ key, label }) => {
+              const active = preferences.interests.includes(key);
               return (
                 <Pressable
-                  key={item}
+                  key={key}
                   style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => toggleInterest(item)}
+                  onPress={() => toggleInterest(key)}
                 >
                   <Text
                     style={[styles.chipText, active && styles.chipTextActive]}
                   >
-                    {item}
+                    {label}
                   </Text>
                 </Pressable>
               );
@@ -345,19 +326,18 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
   },
   stepLabel: {
     fontSize: font.sizeSm,
-    color: colors.textMuted,
-    fontWeight: "700",
+    color: colors.textSub,
+    fontWeight: "600",
     marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   title: {
     fontSize: font.sizeXxl,
     lineHeight: 46,
-    fontWeight: "800",
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 8,
-    letterSpacing: -1,
+    letterSpacing: -0.2,
   },
   subtitle: {
     fontSize: font.sizeMd,

@@ -9,6 +9,7 @@ import {
   fetchUnsplashEditorial,
   getEditorialAltRejectSubstrings,
 } from "./editorial-photos.js";
+import { runConciergeRecommendations } from "./concierge-pipeline.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2421,6 +2422,22 @@ app.post("/generate-moves", async (req, res) => {
           priceText: "$$",
         },
       ],
+    });
+  }
+});
+
+/** GPT-4o orchestration: Ticketmaster + Places + weather → ranked cards + Unsplash heroes */
+app.post("/concierge-recommendations", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const out = await runConciergeRecommendations(req.body || {});
+    res.json(out);
+  } catch (err) {
+    console.error("concierge-recommendations:", err?.message || err);
+    res.status(422).json({
+      error: String(err?.message || err),
+      suggestions: [],
+      meta: null,
     });
   }
 });

@@ -280,7 +280,7 @@ export function buildEditorialSearchQueries({
 export async function fetchUnsplashEditorial(
   apiKey,
   queries,
-  { maxImages = 8, rejectAltSubstrings = [], seed } = {}
+  { maxImages = 8, rejectAltSubstrings = [], seed, minPhotoWidth = 0 } = {}
 ) {
   if (!apiKey || String(apiKey).includes("your_")) {
     return { urls: [], attributions: [] };
@@ -342,6 +342,7 @@ export async function fetchUnsplashEditorial(
 
       for (const p of pool) {
         if (urls.length >= maxImages) break;
+        if (minPhotoWidth > 0 && (Number(p.width) || 0) < minPhotoWidth) continue;
         if (!p?.id || seen.has(p.id)) continue;
         if (rejectors.length > 0) {
           const blob = `${p.alt_description || ""} ${p.description || ""}`.toLowerCase();

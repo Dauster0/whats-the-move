@@ -16,23 +16,7 @@ import {
     getStoredPersonalPlaces,
 } from "../lib/personal-place-storage";
 import { colors, font, radius, spacing } from "../lib/theme";
-
-const INTEREST_OPTIONS = [
-  "coffee",
-  "dessert",
-  "walking",
-  "exploring",
-  "bookstores",
-  "museums",
-  "movies",
-  "comedy",
-  "nightlife",
-  "sports",
-  "working out",
-  "beach",
-  "solo-recharge",
-  "cheap-hangouts",
-];
+import { USER_INTEREST_CHIPS } from "../lib/user-interests";
 
 const NEIGHBORHOOD_OPTIONS = [
   "usc",
@@ -251,7 +235,7 @@ export default function SavePlaceScreen() {
 
         <SectionTitle label="Interests" />
         <ChipGrid
-          options={INTEREST_OPTIONS}
+          options={USER_INTEREST_CHIPS}
           selected={interests}
           onToggle={(value) => setInterests((prev) => toggleString(prev, value))}
         />
@@ -351,24 +335,26 @@ function ChipGrid({
   selected,
   onToggle,
 }: {
-  options: string[];
+  options: readonly string[] | readonly { key: string; label: string }[];
   selected: string[];
   onToggle: (value: string) => void;
 }) {
   return (
     <View style={styles.chipGrid}>
       {options.map((option) => {
-        const active = selected.includes(option);
+        const key = typeof option === "string" ? option : option.key;
+        const label = typeof option === "string" ? option : option.label;
+        const active = selected.includes(key);
         return (
           <Pressable
-            key={option}
+            key={key}
             style={[styles.chip, active && styles.chipActive]}
-            onPress={() => onToggle(option)}
+            onPress={() => onToggle(key)}
           >
             <Text
               style={[styles.chipText, active && styles.chipTextActive]}
             >
-              {option}
+              {label}
             </Text>
           </Pressable>
         );

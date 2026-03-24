@@ -2,27 +2,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, font, radius, spacing } from "../lib/theme";
+import { USER_INTEREST_CHIPS } from "../lib/user-interests";
 import { useMoveStore } from "../store/move-context";
-
-const ALL_INTERESTS = [
-  { key: "walking", label: "Walking" },
-  { key: "coffee", label: "Coffee" },
-  { key: "dessert", label: "Dessert" },
-  { key: "exploring", label: "Exploring" },
-  { key: "bookstores", label: "Bookstores" },
-  { key: "museums", label: "Museums" },
-  { key: "movies", label: "Movies" },
-  { key: "comedy", label: "Comedy" },
-  { key: "nightlife", label: "Nightlife" },
-  { key: "sports", label: "Sports" },
-  { key: "working out", label: "Working out" },
-  { key: "beach", label: "Beach" },
-  { key: "journaling", label: "Journaling" },
-  { key: "reading", label: "Reading" },
-  { key: "calling friends", label: "Calling friends" },
-  { key: "solo-recharge", label: "Solo recharge" },
-  { key: "cheap-hangouts", label: "Cheap hangouts" },
-];
 
 export default function EditInterestsScreen() {
   const { preferences, setPreferences } = useMoveStore();
@@ -56,11 +37,11 @@ export default function EditInterestsScreen() {
 
       <Text style={styles.title}>Edit interests</Text>
       <Text style={styles.subtitle}>
-        Choose the things that actually sound good in real life.
+        Pick what you’d really leave the house for.
       </Text>
 
       <View style={styles.chipGrid}>
-        {ALL_INTERESTS.map((interest) => {
+        {USER_INTEREST_CHIPS.map((interest) => {
           const active = selected.includes(interest.key);
 
           return (
@@ -118,10 +99,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: font.sizeXxl,
     lineHeight: 46,
-    fontWeight: "800",
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 8,
-    letterSpacing: -1,
+    letterSpacing: -0.2,
   },
   subtitle: {
     fontSize: font.sizeMd,

@@ -1,232 +1,84 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
-import { router, type Href } from "expo-router";
-import { useEffect, useMemo } from "react";
+import * as Linking from "expo-linking";
+import { router, useFocusEffect, type Href } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
+  Alert,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../hooks/use-theme-colors";
+import type { ConciergeEnergy, ConciergeSuggestion, ConciergeTimeBudget } from "../lib/concierge-types";
 import { font, radius, spacing } from "../lib/theme";
+import { getReadableLocation } from "../lib/location";
+import { getRecentConciergeTitles, pushRecentConciergeTitle } from "../lib/recent-concierge-storage";
+import { buildUserContextLine } from "../lib/user-context-line";
 import { useMoveStore } from "../store/move-context";
+import { ConciergeHeroCard } from "../components/concierge-hero-card";
 
-function OptionCard({
-  icon,
-  title,
-  subtitle,
-  onPress,
-  variant = "default",
-  iconTint,
-  colors,
-  styles,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  variant?: "hero" | "default";
-  iconTint?: "accent" | "warm" | "muted";
-  colors: ReturnType<typeof useThemeColors>;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  const isHero = variant === "hero";
-  const iconBg =
-    iconTint === "warm"
-      ? "rgba(167, 139, 250, 0.35)"
-      : iconTint === "muted"
-        ? colors.bgMuted
-        : colors.accentSoft;
-  const iconColor =
-    iconTint === "warm"
-      ? colors.accentWarm
-      : iconTint === "muted"
-        ? colors.textMuted
-        : colors.accent;
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        isHero && styles.heroCard,
-        pressed && styles.cardPressed,
-      ]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-    >
-      <View
-        style={[
-          styles.iconWrap,
-          isHero && styles.heroIconWrap,
-          !isHero && { backgroundColor: iconBg },
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={isHero ? 32 : 24}
-          color={isHero ? colors.textOnDark : iconColor}
-        />
-      </View>
-      <View style={styles.optionText}>
-        <Text
-          style={[styles.optionTitle, isHero && styles.heroTitle]}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
-        <Text
-          style={[styles.optionSub, isHero && styles.heroSub]}
-          numberOfLines={1}
-        >
-          {subtitle}
-        </Text>
-      </View>
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color={isHero ? "rgba(255,255,255,0.7)" : colors.textMuted}
-      />
-    </Pressable>
-  );
+const { width: SCREEN_W } = Dimensions.get("window");
+const CARD_W = SCREEN_W;
+const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.154:3001";
+
+type LoadMode = "full" | "refresh" | "background";
+
+function openMapsQuery(q: string) {
+  const query = String(q || "").trim();
+  if (!query) return;
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  Linking.openURL(url).catch(() => {});
 }
 
-function createStyles(colors: ReturnType<typeof useThemeColors>) {
-  const cardShadow = Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-    },
-    android: { elevation: 4 },
-    default: {},
-  });
-  const isDark = colors.bg === "#12100E";
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.bg },
-    content: {
-      paddingTop: 56,
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.xxl,
-    },
-    loadingScreen: {
-      flex: 1,
-      backgroundColor: colors.bg,
-      justifyContent: "center",
-      alignItems: "center",
-      gap: spacing.sm,
-    },
-    loadingText: { fontSize: font.sizeMd, color: colors.textMuted },
-    header: { marginBottom: spacing.lg },
-    eyebrow: {
-      fontSize: 11,
-      fontWeight: "800",
-      letterSpacing: 2.5,
-      color: colors.accent,
-      marginBottom: 6,
-      textTransform: "uppercase",
-    },
-    title: {
-      fontSize: 40,
-      fontWeight: "800",
-      color: colors.text,
-      letterSpacing: -0.5,
-      lineHeight: 44,
-      marginBottom: 6,
-    },
-    subtitle: {
-      fontSize: font.sizeMd,
-      color: colors.textSub,
-      lineHeight: 24,
-    },
-    headerAccent: {
-      width: 48,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.accent,
-      marginTop: spacing.md,
-      opacity: 0.9,
-    },
-    sectionLabel: {
-      fontSize: 12,
-      fontWeight: "700",
-      letterSpacing: 1,
-      color: colors.textSub,
-      marginBottom: spacing.sm,
-      marginTop: spacing.lg,
-    },
-    heroSection: { marginBottom: spacing.xs },
-    cardStack: { gap: spacing.sm, marginBottom: spacing.xs },
-    card: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.bgCard,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...cardShadow,
-    },
-    heroCard: {
-      backgroundColor: isDark ? colors.bgCardSoft : "#252119",
-      borderColor: isDark ? colors.bgCardSoft : "#252119",
-      padding: spacing.lg,
-      borderLeftWidth: 4,
-      borderLeftColor: "rgba(99, 102, 241, 0.5)",
-      ...Platform.select({
-        ios: {
-          shadowColor: colors.shadow,
-          shadowOpacity: 0.15,
-          shadowRadius: 16,
-        },
-        android: { elevation: 8 },
-        default: {},
-      }),
-    },
-    cardPressed: { opacity: 0.94 },
-    iconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: radius.md,
-      backgroundColor: colors.accentSoft,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: spacing.md,
-    },
-    heroIconWrap: {
-      backgroundColor: "rgba(255,255,255,0.15)",
-    },
-    optionText: { flex: 1, minWidth: 0 },
-    optionTitle: {
-      fontSize: font.sizeLg,
-      fontWeight: "700",
-      color: colors.text,
-    },
-    heroTitle: {
-      fontSize: 22,
-      color: colors.textOnDark,
-    },
-    optionSub: {
-      fontSize: font.sizeSm,
-      color: colors.textSub,
-      marginTop: 2,
-    },
-    heroSub: {
-      color: "rgba(255,255,255,0.75)",
-      marginTop: 4,
-    },
-  });
+function mapApiConciergeSuggestion(x: Record<string, unknown>): ConciergeSuggestion {
+  return {
+    title: String(x.title ?? ""),
+    description: String(x.description ?? ""),
+    category: String(x.category ?? "experience"),
+    timeRequired: String(x.timeRequired ?? ""),
+    energyLevel: String(x.energyLevel ?? "medium"),
+    address: String(x.address ?? ""),
+    startTime: String(x.startTime ?? ""),
+    venueName: String(x.venueName ?? ""),
+    mapQuery: String(x.mapQuery ?? x.title ?? ""),
+    unsplashQuery: String(x.unsplashQuery ?? ""),
+    whyNow: String(x.whyNow ?? ""),
+    ticketUrl: String(x.ticketUrl ?? ""),
+    ticketEventId: String(x.ticketEventId ?? ""),
+    sourcePlaceName: String(x.sourcePlaceName ?? ""),
+    photoUrl: x.photoUrl ? String(x.photoUrl) : null,
+    imageLayout: x.imageLayout === "poster" ? "poster" : "cover",
+    photoSource: x.photoSource != null ? String(x.photoSource) : null,
+  };
 }
 
 export default function HomeScreen() {
   const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const { hasFinishedOnboarding, isLoaded } = useMoveStore();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const { hasFinishedOnboarding, isLoaded, preferences } = useMoveStore();
+
+  const [energy, setEnergy] = useState<ConciergeEnergy>("medium");
+  const [timeBudget, setTimeBudget] = useState<ConciergeTimeBudget>("mid");
+  const [suggestions, setSuggestions] = useState<ConciergeSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [areaLabel, setAreaLabel] = useState("");
+  const [cardIndex, setCardIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
+  const hasHadFocusOnce = useRef(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -235,11 +87,101 @@ export default function HomeScreen() {
     }
   }, [isLoaded, hasFinishedOnboarding]);
 
+  const load = useCallback(async (mode: LoadMode = "full") => {
+    if (mode === "refresh") setRefreshing(true);
+    else if (mode === "full") setLoading(true);
+    if (mode !== "background") setError("");
+    try {
+      const loc = await getReadableLocation();
+      const place = loc.place || "near you";
+      setAreaLabel(place);
+      const recentSuggestions = await getRecentConciergeTitles();
+      const nowIso = new Date().toISOString();
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const prefs = preferencesRef.current;
+
+      const res = await fetch(`${SERVER_URL}/concierge-recommendations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: loc.lat,
+          lng: loc.lon,
+          areaLabel: place,
+          nowIso,
+          timeZone,
+          energy,
+          timeBudget,
+          interests: prefs.interests ?? [],
+          recentSuggestions,
+          userContextLine: buildUserContextLine(prefs),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (mode === "background") return;
+        setSuggestions([]);
+        setError(typeof data.error === "string" ? data.error : "Couldn’t load picks.");
+        return;
+      }
+      const rawList = Array.isArray(data.suggestions) ? data.suggestions : [];
+      const list = rawList.map((item: unknown) =>
+        mapApiConciergeSuggestion(item && typeof item === "object" ? (item as Record<string, unknown>) : {})
+      );
+      setSuggestions(list);
+      setCardIndex(0);
+      scrollRef.current?.scrollTo({ x: 0, animated: false });
+      if (list.length === 0) {
+        if (mode !== "background") setError("Nothing came back—try refresh.");
+      }
+    } catch {
+      if (mode !== "background") {
+        setSuggestions([]);
+        setError("Network hiccup. Pull to try again.");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [energy, timeBudget]);
+
+  useEffect(() => {
+    if (!isLoaded || !hasFinishedOnboarding) return;
+    load("full");
+  }, [isLoaded, hasFinishedOnboarding, energy, timeBudget, load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoaded || !hasFinishedOnboarding) return;
+      if (!hasHadFocusOnce.current) {
+        hasHadFocusOnce.current = true;
+        return;
+      }
+      void load("background");
+    }, [isLoaded, hasFinishedOnboarding, load])
+  );
+
+  function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const x = e.nativeEvent.contentOffset.x;
+    const i = Math.round(x / CARD_W);
+    setCardIndex(Math.max(0, Math.min(i, suggestions.length - 1)));
+  }
+
+  function openMenu() {
+    Alert.alert("Elsewhere", undefined, [
+      { text: "Interests", onPress: () => router.push("/edit-interests") },
+      { text: "Your details", onPress: () => router.push("/my-context" as Href) },
+      { text: "Shuffle deck", onPress: () => router.push("/suggestions") },
+      { text: "Full finder", onPress: () => router.push("/whats-the-move-ai") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   if (!isLoaded) {
     return (
       <View style={styles.loadingScreen}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>One sec.</Text>
       </View>
     );
   }
@@ -251,86 +193,287 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.outerScroll}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => load("refresh")}
+          tintColor={colors.accent}
+        />
+      }
     >
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Stop scrolling. Start doing.</Text>
-        <Text style={styles.title}>What's the move?</Text>
-        <Text style={styles.subtitle}>
-          Tap below to find real places & events near you.
+      <View style={styles.topBar}>
+        <Text style={styles.areaPill} numberOfLines={1}>
+          {areaLabel || "Near you"}
         </Text>
-        <View style={styles.headerAccent} />
+        <Pressable style={styles.menuBtn} onPress={openMenu} hitSlop={10}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
+        </Pressable>
       </View>
 
-      <View style={styles.heroSection}>
-        <OptionCard
-          icon="sparkles"
-          title="Find places near me"
-          subtitle="Cafes, concerts, walks & more—one tap"
-          onPress={() => router.push("/whats-the-move-ai")}
-          variant="hero"
-          colors={colors}
-          styles={styles}
-        />
+      <Text style={styles.screenTitle}>{"What's the move?"}</Text>
+
+      <View style={styles.controlBlock}>
+        <Text style={styles.controlLabel}>Energy</Text>
+        <View style={styles.segmentRow}>
+            {(
+            [
+              { key: "low" as const, icon: "moon-outline" as const, label: "Low" },
+              { key: "medium" as const, icon: "flash-outline" as const, label: "Mid" },
+              { key: "high" as const, icon: "rocket-outline" as const, label: "High" },
+            ] as const
+          ).map(({ key, icon, label }) => {
+            const active = energy === key;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.segment, active && styles.segmentActive]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setEnergy(key);
+                }}
+              >
+                <Ionicons
+                  name={icon}
+                  size={20}
+                  color={active ? colors.textInverse : colors.text}
+                />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Time</Text>
+        <View style={styles.segmentRow}>
+          {(
+            [
+              { key: "30min" as const, label: "~30 min" },
+              { key: "mid" as const, label: "1–3 hrs" },
+              { key: "allday" as const, label: "No rush" },
+            ] as const
+          ).map(({ key, label }) => {
+            const active = timeBudget === key;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.segment, active && styles.segmentActive]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setTimeBudget(key);
+                }}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <Text style={styles.sectionLabel}>Or try this</Text>
-      <View style={styles.cardStack}>
-        <OptionCard
-          icon="compass"
-          title="Get a random idea"
-          subtitle="Swipe through quick suggestions"
-          onPress={() => router.push("/suggestions")}
-          iconTint="accent"
-          colors={colors}
-          styles={styles}
-        />
-      </View>
-
-      <Text style={styles.sectionLabel}>More</Text>
-      <View style={styles.cardStack}>
-        <OptionCard
-          icon="time"
-          title="Screen time"
-          subtitle="Time you've reclaimed"
-          onPress={() => router.push("/stopwatch")}
-          iconTint="warm"
-          colors={colors}
-          styles={styles}
-        />
-        <OptionCard
-          icon="bar-chart"
-          title="Weekly report"
-          subtitle="Progress and stats"
-          onPress={() => router.push("/weekly-report")}
-          iconTint="warm"
-          colors={colors}
-          styles={styles}
-        />
-      </View>
-
-      <Text style={styles.sectionLabel}>More</Text>
-      <View style={styles.cardStack}>
-        <OptionCard
-          icon="heart"
-          title="Edit interests"
-          subtitle="Customize suggestions"
-          onPress={() => router.push("/edit-interests")}
-          iconTint="muted"
-          colors={colors}
-          styles={styles}
-        />
-        <OptionCard
-          icon="person"
-          title="Your context"
-          subtitle="Home area, school, budget fit, introvert or extrovert"
-          onPress={() => router.push("/my-context" as Href)}
-          iconTint="muted"
-          colors={colors}
-          styles={styles}
-        />
-      </View>
+      {loading && suggestions.length === 0 ? (
+        <View style={styles.loadingBlock}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingBlurb}>Reading the room…</Text>
+          <Text style={styles.loadingSub}>Pulling what’s open, what’s on, and what fits you.</Text>
+        </View>
+      ) : error && suggestions.length === 0 ? (
+        <View style={styles.loadingBlock}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              load("full");
+            }}
+          >
+            <Text style={styles.retryBtnText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {suggestions.length > 1 ? (
+            <Text style={styles.swipeHint}>
+              Swipe sideways · {cardIndex + 1} of {suggestions.length}
+            </Text>
+          ) : null}
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onScrollEnd}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
+            contentContainerStyle={styles.cardsScrollContent}
+          >
+            {suggestions.map((s, idx) => (
+              <View key={`${s.title}-${idx}`} style={[styles.cardShell, { width: CARD_W }]}>
+                <ConciergeHeroCard
+                  suggestion={s}
+                  width={CARD_W}
+                  colors={colors}
+                  onOpenMaps={(sg) => {
+                    void pushRecentConciergeTitle(sg.title);
+                    openMapsQuery(sg.mapQuery || sg.title);
+                  }}
+                  onOpenTickets={(sg) => {
+                    void pushRecentConciergeTitle(sg.title);
+                    const u = String(sg.ticketUrl || "").trim();
+                    if (u) Linking.openURL(u).catch(() => {});
+                  }}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </>
+      )}
     </ScrollView>
   );
+}
+
+function createStyles(colors: ReturnType<typeof useThemeColors>, insetTop: number) {
+  const topPad = Math.max(insetTop, 12);
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    outerScroll: {
+      flexGrow: 1,
+      paddingBottom: spacing.xxl,
+    },
+    loadingScreen: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    loadingText: { fontSize: font.sizeMd, color: colors.textMuted, fontWeight: "500" },
+    topBar: {
+      paddingTop: topPad,
+      paddingHorizontal: spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6,
+    },
+    areaPill: {
+      flex: 1,
+      marginRight: spacing.sm,
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textSub,
+    },
+    menuBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.bgCard,
+    },
+    screenTitle: {
+      fontSize: 28,
+      fontWeight: "700",
+      letterSpacing: -0.4,
+      color: colors.text,
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    controlBlock: {
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.md,
+    },
+    controlLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+      marginBottom: 8,
+    },
+    segmentRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    segment: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgCard,
+    },
+    segmentActive: {
+      backgroundColor: colors.bgDark,
+      borderColor: colors.bgDark,
+    },
+    segmentText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    segmentTextActive: {
+      color: colors.textInverse,
+    },
+    swipeHint: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+      paddingHorizontal: spacing.md,
+      marginBottom: 8,
+    },
+    cardsScrollContent: {
+      alignItems: "stretch",
+    },
+    cardShell: {
+      paddingHorizontal: 0,
+    },
+    loadingBlock: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+      gap: spacing.sm,
+      minHeight: 280,
+    },
+    loadingBlurb: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text,
+      marginTop: spacing.sm,
+    },
+    loadingSub: {
+      fontSize: 14,
+      color: colors.textSub,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+    errorText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textSub,
+      textAlign: "center",
+    },
+    retryBtn: {
+      marginTop: spacing.md,
+      paddingVertical: 12,
+      paddingHorizontal: 22,
+      backgroundColor: colors.bgDark,
+      borderRadius: radius.sm,
+    },
+    retryBtnText: {
+      color: colors.textInverse,
+      fontWeight: "700",
+      fontSize: 15,
+    },
+  });
 }

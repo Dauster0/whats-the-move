@@ -681,10 +681,10 @@ export default function WhatsTheMoveAI() {
       <Pressable style={styles.backBtn} onPress={() => router.back()}>
         <Text style={styles.backArrow}>← Back</Text>
       </Pressable>
-      <Text style={styles.eyebrow}>Start in the next hour</Text>
-      <Text style={styles.header}>What can I do right now?</Text>
+      <Text style={styles.eyebrow}>Next hour or so</Text>
+      <Text style={styles.header}>What are you in the mood for?</Text>
       <Text style={styles.subheader}>
-        We prioritize spots Google says are open, tonight’s events, and outdoor moves you can start immediately.
+        We lean on what’s open now, same-night stuff, and quick outdoor options when that fits.
       </Text>
 
       <View style={styles.contextBox}>
@@ -697,7 +697,7 @@ export default function WhatsTheMoveAI() {
         )}
       </View>
 
-      <Text style={styles.sectionTitle}>Energy level</Text>
+      <Text style={styles.sectionTitle}>Energy</Text>
       <View style={styles.row}>
         {(["calm", "energetic", "don't care"] as const).map((value) => (
           <TouchableOpacity
@@ -712,7 +712,7 @@ export default function WhatsTheMoveAI() {
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>Time you have</Text>
+      <Text style={styles.sectionTitle}>How long do you have?</Text>
       <View style={styles.row}>
         {[
           { value: "1–15 min", label: "Quick" },
@@ -734,7 +734,7 @@ export default function WhatsTheMoveAI() {
 
       <Text style={styles.sectionTitle}>Hungry?</Text>
       <Text style={styles.sectionHint}>
-        Not hungry skips restaurants &amp; cafes; Hungry prioritizes food spots.
+        “Not hungry” dials back restaurants; “Hungry” bumps food up.
       </Text>
       <View style={styles.row}>
         {(
@@ -767,14 +767,14 @@ export default function WhatsTheMoveAI() {
         disabled={loading}
       >
         <Text style={styles.generateButtonText}>
-          {loading ? "Finding moves…" : "Find moves now"}
+          {loading ? "Looking…" : "Show me ideas"}
         </Text>
       </TouchableOpacity>
 
       {loading && (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Finding open-now & tonight picks near you</Text>
+          <Text style={styles.loadingText}>Pulling places and tonight’s options near you</Text>
         </View>
       )}
 
@@ -790,9 +790,9 @@ export default function WhatsTheMoveAI() {
       {!loading && errorText === "" && moves.length === 0 && (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>📍</Text>
-          <Text style={styles.emptyTitle}>Tap “Find moves now” above</Text>
+          <Text style={styles.emptyTitle}>Tap “Show me ideas” when you’re ready</Text>
           <Text style={styles.emptySub}>
-            We’ll rank things you can start soon—open venues, shows, and quick outdoor moves.
+            You’ll get a short list: open spots, shows, and easy outdoor options when they make sense.
           </Text>
         </View>
       )}
@@ -904,14 +904,14 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
   },
   eyebrow: {
     fontSize: font.sizeSm,
-    fontWeight: "700",
-    letterSpacing: 2,
-    color: colors.textMuted,
+    fontWeight: "600",
+    letterSpacing: 0,
+    color: colors.textSub,
     marginBottom: 8,
   },
   header: {
-    fontSize: 36,
-    fontWeight: "800",
+    fontSize: 34,
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 6,
   },
@@ -946,9 +946,9 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
   },
   sectionTitle: {
     fontSize: font.sizeSm,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    color: colors.textMuted,
+    fontWeight: "600",
+    letterSpacing: 0,
+    color: colors.textSub,
     marginBottom: 10,
     marginTop: 10,
   },
@@ -967,13 +967,16 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
     marginBottom: 16,
   },
   choiceButton: {
-    backgroundColor: colors.bgMuted,
+    backgroundColor: colors.bgCard,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   choiceButtonActive: {
     backgroundColor: colors.bgDark,
+    borderColor: colors.bgDark,
   },
   choiceText: {
     color: colors.text,
@@ -995,9 +998,9 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
     opacity: 0.7,
   },
   generateButtonText: {
-    color: "#ffffff",
+    color: colors.textInverse,
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   loadingBox: {
     marginTop: spacing.lg,
@@ -1086,9 +1089,9 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
     fontWeight: "600",
   },
   cardTitle: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "800",
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 8,
     paddingHorizontal: 20,
@@ -1112,21 +1115,25 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
   },
   metaPill: {
     fontSize: 13,
-    fontWeight: "600",
-    color: colors.textMuted,
+    fontWeight: "500",
+    color: colors.textSub,
     backgroundColor: colors.bgCardSoft,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   openNowPill: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#166534",
-    backgroundColor: "rgba(34, 197, 94, 0.2)",
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
     paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.35)",
   },
 });
 }

@@ -11,9 +11,10 @@ export const colorsLight = {
   textInverse: "#FFFDF9",
   textOnDark: "#F5F2EC",
 
-  accent: "#6366F1",
-  accentSoft: "#C7D2FE",
-  accentWarm: "#A78BFA",
+  /** Warm rust — avoids generic indigo “AI app” look */
+  accent: "#8B3A1F",
+  accentSoft: "#EDD5C8",
+  accentWarm: "#B45309",
 
   border: "#E2D7C8",
   borderStrong: "#D5C7B3",
@@ -38,9 +39,9 @@ export const colorsDark = {
   textInverse: "#181512",
   textOnDark: "#F5F2EC",
 
-  accent: "#818CF8",
-  accentSoft: "rgba(129, 140, 248, 0.25)",
-  accentWarm: "#A78BFA",
+  accent: "#E8A87C",
+  accentSoft: "rgba(232, 168, 124, 0.22)",
+  accentWarm: "#F4C4A8",
 
   border: "#2E2A24",
   borderStrong: "#3D3830",
@@ -59,12 +60,14 @@ export function getColors(isDark: boolean) {
   return isDark ? colorsDark : colorsLight;
 }
 
+/** Mostly square corners — reads more editorial / human than pill cards */
 export const radius = {
-  sm: 14,
-  md: 20,
-  lg: 28,
-  xl: 36,
-  full: 999,
+  sm: 2,
+  md: 3,
+  lg: 4,
+  xl: 4,
+  /** Tags and chips: slight corner, not full pill */
+  full: 6,
 };
 
 export const spacing = {

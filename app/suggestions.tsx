@@ -705,11 +705,11 @@ const styles = StyleSheet.create({
 
   loadingTitle: {
     fontSize: 24,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#171311",
     marginBottom: 8,
     textAlign: "center",
-    letterSpacing: -0.5,
+    letterSpacing: -0.2,
   },
 
   loadingSub: {
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 3,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
     minWidth: 54,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 3,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderWidth: 1,
@@ -780,9 +780,8 @@ const styles = StyleSheet.create({
   counterLabel: {
     fontSize: 10,
     color: "#9A8F82",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    letterSpacing: 0,
     marginTop: 1,
   },
 
@@ -804,15 +803,15 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: 4,
     padding: 24,
     borderWidth: 1,
     borderColor: "#E8E0D5",
     shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
 
   topRow: {
@@ -824,23 +823,24 @@ const styles = StyleSheet.create({
 
   vibePill: {
     backgroundColor: "#F4EDE2",
-    borderRadius: 999,
+    borderRadius: 4,
     paddingVertical: 8,
     paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#E4DACD",
   },
 
   vibeText: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     color: "#6E6255",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
 
   infoBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 3,
     backgroundColor: "#F4EDE2",
     alignItems: "center",
     justifyContent: "center",
@@ -853,11 +853,11 @@ const styles = StyleSheet.create({
   },
 
   moveTitle: {
-    fontSize: 32,
-    fontWeight: "800",
+    fontSize: 30,
+    fontWeight: "700",
     color: "#171311",
-    lineHeight: 38,
-    letterSpacing: -1.2,
+    lineHeight: 36,
+    letterSpacing: -0.3,
     marginBottom: 10,
   },
 
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
   reactionButton: {
     width: 46,
     height: 46,
-    borderRadius: 23,
+    borderRadius: 3,
     backgroundColor: "#F7F1E8",
     borderWidth: 1,
     borderColor: "#E4DACD",
@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
 
   startButton: {
     backgroundColor: "#171311",
-    borderRadius: 22,
+    borderRadius: 4,
     paddingVertical: 20,
     alignItems: "center",
     justifyContent: "center",
@@ -931,12 +931,12 @@ const styles = StyleSheet.create({
   startButtonText: {
     color: "#FFFFFF",
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "700",
   },
 
   mapButton: {
     backgroundColor: "#F7F1E8",
-    borderRadius: 22,
+    borderRadius: 4,
     paddingVertical: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -985,8 +985,8 @@ const styles = StyleSheet.create({
 
   modalCard: {
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
     padding: 20,
     paddingBottom: 40,
   },
@@ -1002,10 +1002,10 @@ const styles = StyleSheet.create({
 
   modalTitle: {
     fontSize: 26,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#171311",
     marginBottom: 6,
-    letterSpacing: -0.8,
+    letterSpacing: -0.2,
   },
 
   modalSubtitle: {
@@ -1022,9 +1022,8 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 11,
     color: "#9A8F82",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    fontWeight: "600",
+    letterSpacing: 0,
     marginBottom: 4,
   },
 
@@ -1050,7 +1049,7 @@ const styles = StyleSheet.create({
 
   whyBox: {
     backgroundColor: "#F7F1E8",
-    borderRadius: 18,
+    borderRadius: 4,
     padding: 14,
     marginTop: 6,
     marginBottom: 14,
@@ -1061,7 +1060,7 @@ const styles = StyleSheet.create({
   whyTitle: {
     fontSize: 14,
     color: "#171311",
-    fontWeight: "800",
+    fontWeight: "700",
     marginBottom: 6,
   },
 
@@ -1073,7 +1072,7 @@ const styles = StyleSheet.create({
 
   modalButton: {
     backgroundColor: "#171311",
-    borderRadius: 20,
+    borderRadius: 4,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 10,
@@ -1087,7 +1086,7 @@ const styles = StyleSheet.create({
 
   modalSecondaryButton: {
     backgroundColor: "#F7F1E8",
-    borderRadius: 20,
+    borderRadius: 4,
     paddingVertical: 16,
     alignItems: "center",
     borderWidth: 1,

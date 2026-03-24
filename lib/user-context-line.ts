@@ -17,7 +17,7 @@ export function buildUserContextLine(prefs: UserPreferences): string {
   }
 
   if (prefs.interests?.length) {
-    bits.push(`enjoys ${prefs.interests.slice(0, 8).join(", ")}`);
+    bits.push(`enjoys ${prefs.interests.slice(0, 14).join(", ")}`);
   }
 
   if (prefs.preferredTimes?.length && prefs.preferredTimes.length < 5) {

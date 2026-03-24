@@ -43,8 +43,27 @@ Check these in order:
 | `TICKETMASTER_API_KEY` | [developer.ticketmaster.com](https://developer.ticketmaster.com) (optional) |
 | `EXPO_PUBLIC_TICKETMASTER_API_KEY` | Same as above (optional) |
 | `EXPO_PUBLIC_INTERNATIONAL_SHOWTIMES_API_KEY` | [internationalshowtimes.com](https://www.internationalshowtimes.com) (optional) |
+| `CONCIERGE_MODEL` | Optional OpenAI model id for the home **concierge** pipeline (defaults to **`gpt-4o`**). Same `OPENAI_API_KEY` as the rest of the server. |
 
 **Minimum required:** `OPENAI_API_KEY`, `GOOGLE_PLACES_API_KEY`, and `UNSPLASH_ACCESS_KEY` (for imagery; without Unsplash, photo endpoints return empty URLs).
+
+#### Home screen: `POST /concierge-recommendations`
+
+The **home** tab builds 4–5 “right now” picks through this route (not cached; responses use `Cache-Control: no-store`). The server gathers **weather** (Open-Meteo), **events** (Ticketmaster when `TICKETMASTER_API_KEY` or `EXPO_PUBLIC_TICKETMASTER_API_KEY` is set), **nearby places** (Google Places API **New** — `searchNearby`), then calls **OpenAI** with a structured JSON response, and attaches **Unsplash** images per suggestion.
+
+- **Body (JSON):** `lat`, `lng`, `areaLabel`, `nowIso`, `timeZone`, `energy` (`low` | `medium` | `high`), `timeBudget` (`30min` | `mid` | `allday`), `interests` (string array), `recentSuggestions` (titles to avoid repeating), optional `userContextLine`.
+- **Success:** `{ suggestions: [...], meta?: {...} }` — each suggestion includes `title`, `description`, `category`, `timeRequired`, `energyLevel`, optional `address` / `startTime` / `whyNow` / `ticketUrl`, plus `photoUrl` when Unsplash succeeds.
+- **Failure:** `422` with `{ error: string, suggestions: [], meta: null }` if the pipeline cannot produce picks.
+
+Quick check (replace host and use real coordinates):
+
+```bash
+curl -sS -X POST "https://YOUR-RAILWAY-URL/concierge-recommendations" \
+  -H "Content-Type: application/json" \
+  -d '{"lat":34.05,"lng":-118.24,"areaLabel":"LA","timeZone":"America/Los_Angeles","energy":"medium","timeBudget":"mid","interests":["live music"],"recentSuggestions":[],"userContextLine":""}'
+```
+
+If `nowIso` is omitted or blank, the server uses the current time.
 
 4. Click **Deploy** if it doesn’t auto-redeploy
 

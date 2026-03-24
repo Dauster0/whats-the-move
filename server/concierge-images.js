@@ -1,0 +1,279 @@
+/**
+ * Concierge card imagery: Ticketmaster promo art, venue og:image, Unsplash vibe,
+ * Google Places photo (last resort). See concierge-pipeline for orchestration.
+ */
+
+import { fetchUnsplashEditorial } from "./editorial-photos.js";
+
+const MIN_PIXEL_WIDTH = 800;
+
+function normalizeTicketUrl(u) {
+  try {
+    const x = new URL(String(u || "").trim());
+    x.hash = "";
+    const keys = [...x.searchParams.keys()];
+    for (const k of keys) {
+      if (/^utm_/i.test(k) || k === "referrer") x.searchParams.delete(k);
+    }
+    let out = x.href;
+    if (out.endsWith("/")) out = out.slice(0, -1);
+    return out.toLowerCase();
+  } catch {
+    return String(u || "")
+      .trim()
+      .toLowerCase();
+  }
+}
+
+function normalizeRatio(r) {
+  return String(r || "")
+    .replace(/×/g, "x")
+    .replace(/:/g, "_");
+}
+
+function isSkippableTmImage(img) {
+  if (!img || !img.url) return true;
+  if (img.fallback === true) return true;
+  const w = Number(img.width) || 0;
+  const h = Number(img.height) || 0;
+  if (w > 0 && w < MIN_PIXEL_WIDTH) return true;
+  const u = String(img.url).toLowerCase();
+  if (/\blogo\b|favicon|\/icon\.|badge|avatar|1x1|pixel\.gif/.test(u)) return true;
+  const r = normalizeRatio(img.ratio);
+  if ((r === "1_1" || r === "1x1") && w > 0 && w < 1200) return true;
+  if (h > 0 && w > 0) {
+    const aspect = w / h;
+    if (aspect < 1.15 && aspect > 0.85 && w < 1100) return true;
+  }
+  return false;
+}
+
+/**
+ * Prefer attraction promo art, then event images. Card = 16_9 first; widen to 3_2, 4_3.
+ */
+export function pickTicketmasterCardImage(record) {
+  if (!record) return null;
+  const ratioOrder = ["16_9", "16x9", "3_2", "3x2", "4_3", "4x3"];
+
+  function pickFromList(images) {
+    const list = Array.isArray(images) ? images : [];
+    for (const want of ratioOrder) {
+      const candidates = list.filter((img) => {
+        if (isSkippableTmImage(img)) return false;
+        const r = normalizeRatio(img.ratio);
+        return r === want || r === want.replace("x", "_");
+      });
+      candidates.sort((a, b) => (Number(b.width) || 0) - (Number(a.width) || 0));
+      if (candidates.length) return String(candidates[0].url);
+    }
+    const any = list
+      .filter((img) => !isSkippableTmImage(img) && (Number(img.width) || 0) >= MIN_PIXEL_WIDTH)
+      .sort((a, b) => (Number(b.width) || 0) - (Number(a.width) || 0));
+    return any.length ? String(any[0].url) : null;
+  }
+
+  for (const a of record.attractions || []) {
+    const u = pickFromList(a.images);
+    if (u) return u;
+  }
+  return pickFromList(record.images);
+}
+
+export function buildTicketmasterLookup(records) {
+  const byId = new Map();
+  const byUrl = new Map();
+  for (const e of records || []) {
+    if (e?.id) byId.set(String(e.id), e);
+    if (e?.url) byUrl.set(normalizeTicketUrl(e.url), e);
+  }
+  return { byId, byUrl };
+}
+
+export function resolveTicketmasterRecord(suggestion, lookup) {
+  if (!lookup) return null;
+  const id = suggestion.ticketEventId ? String(suggestion.ticketEventId).trim() : "";
+  if (id && lookup.byId.has(id)) return lookup.byId.get(id);
+  const u = suggestion.ticketUrl ? String(suggestion.ticketUrl).trim() : "";
+  if (u && lookup.byUrl.has(normalizeTicketUrl(u))) return lookup.byUrl.get(normalizeTicketUrl(u));
+  return null;
+}
+
+function looksLikeBadOgUrl(href) {
+  const low = href.toLowerCase();
+  if (!/^https?:\/\//.test(low)) return true;
+  if (/favicon|apple-touch|sprite\.png|logo\.svg|wixstatic.*\.svg/.test(low)) return true;
+  return false;
+}
+
+export async function fetchOgImageUrl(websiteUrl) {
+  const raw = String(websiteUrl || "").trim();
+  if (!raw || !/^https?:\/\//i.test(raw)) return null;
+  try {
+    const r = await fetch(raw, {
+      redirect: "follow",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; WhatsTheMove/1.0; +https://whats-the-move.app)",
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const re =
+      /<meta\s+[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["'][^>]*>|<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["'][^>]*>/i;
+    const m = html.match(re);
+    let img = (m && (m[1] || m[2]) ? m[1] || m[2] : "").trim();
+    if (!img) return null;
+    if (img.startsWith("//")) img = `https:${img}`;
+    const abs = new URL(img, raw).href;
+    if (looksLikeBadOgUrl(abs)) return null;
+    return abs;
+  } catch {
+    return null;
+  }
+}
+
+export function googlePlacePhotoMediaUrl(photoResourceName, apiKey, maxWidthPx = 1600) {
+  if (!photoResourceName || !apiKey) return null;
+  const name = String(photoResourceName).replace(/^\/+/, "");
+  return `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidthPx}&key=${encodeURIComponent(apiKey)}`;
+}
+
+function pickPlacePhotoNames(photos) {
+  if (!Array.isArray(photos) || photos.length === 0) return [];
+  const sorted = [...photos].sort((a, b) => {
+    const aw = Number(a.widthPx || a.width || 0);
+    const bw = Number(b.widthPx || b.width || 0);
+    return bw - aw;
+  });
+  const names = [];
+  for (const p of sorted) {
+    const n = p.name || p.googleMapsUri;
+    if (!n || typeof n !== "string") continue;
+    const w = Number(p.widthPx || p.width || 0);
+    if (w > 0 && w < MIN_PIXEL_WIDTH) continue;
+    names.push(n);
+    if (names.length >= 2) break;
+  }
+  if (names.length === 0 && sorted[0]?.name) names.push(sorted[0].name);
+  return names;
+}
+
+function normalizeName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isTicketedEventSuggestion(s) {
+  return Boolean(
+    (s.ticketUrl && String(s.ticketUrl).trim()) || (s.ticketEventId && String(s.ticketEventId).trim())
+  );
+}
+
+export function matchNearbyPlace(suggestion, nearbyPlaces) {
+  const explicit = suggestion.sourcePlaceName ? String(suggestion.sourcePlaceName).trim() : "";
+  if (explicit && nearbyPlaces?.length) {
+    const hit = nearbyPlaces.find((p) => p.name === explicit);
+    if (hit) return hit;
+    const ex = normalizeName(explicit);
+    const fuzzy = nearbyPlaces.find((p) => normalizeName(p.name) === ex);
+    if (fuzzy) return fuzzy;
+  }
+  const mq = normalizeName(suggestion.mapQuery || suggestion.title || "");
+  if (!mq || !nearbyPlaces?.length) return null;
+  const firstChunk = mq.split(/[,|·]/)[0]?.trim() || mq;
+  let best = null;
+  let bestLen = 0;
+  for (const p of nearbyPlaces) {
+    const pn = normalizeName(p.name);
+    if (!pn) continue;
+    if (mq.includes(pn) || pn.includes(firstChunk)) {
+      if (pn.length > bestLen) {
+        bestLen = pn.length;
+        best = p;
+      }
+    }
+  }
+  return best;
+}
+
+export async function resolveConciergeSuggestionImages({
+  suggestions,
+  ticketmasterRecords,
+  nearbyPlaces,
+  unsplashKey,
+  seedBase,
+  googleApiKey,
+}) {
+  const lookup = buildTicketmasterLookup(ticketmasterRecords);
+
+  const enriched = [];
+  for (let i = 0; i < suggestions.length; i++) {
+    const s = { ...suggestions[i] };
+    let photoUrl = null;
+    let imageLayout = "cover";
+    let photoSource = null;
+
+    const tmRecord = resolveTicketmasterRecord(s, lookup);
+    const ticketed = isTicketedEventSuggestion(s);
+    const place = !ticketed ? matchNearbyPlace(s, nearbyPlaces) : null;
+
+    if (tmRecord) {
+      const tmUrl = pickTicketmasterCardImage(tmRecord);
+      if (tmUrl) {
+        photoUrl = tmUrl;
+        imageLayout = "poster";
+        photoSource = "ticketmaster";
+      }
+    }
+
+    if (!photoUrl && place?.websiteUri) {
+      const og = await fetchOgImageUrl(place.websiteUri);
+      if (og) {
+        photoUrl = og;
+        photoSource = "website";
+      }
+    }
+
+    if (!photoUrl && unsplashKey) {
+      const q = String(s.unsplashQuery || "").trim();
+      const fallbacks = ticketed
+        ? [q || `${s.title} live show atmosphere`, "concert stage lights crowd night energy"]
+        : [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
+      try {
+        const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+          maxImages: 1,
+          seed: `${seedBase}-${i}-${ticketed ? "t" : "p"}`,
+          minPhotoWidth: MIN_PIXEL_WIDTH,
+        });
+        if (urls[0]) {
+          photoUrl = urls[0];
+          photoSource = photoSource || "unsplash";
+        }
+      } catch {
+        /* keep null */
+      }
+    }
+
+    if (!photoUrl && place && googleApiKey) {
+      const names = pickPlacePhotoNames(place.photos);
+      for (const pname of names) {
+        const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1600);
+        if (u) {
+          photoUrl = u;
+          photoSource = "google_places";
+          break;
+        }
+      }
+    }
+
+    s.photoUrl = photoUrl;
+    s.imageLayout = imageLayout;
+    s.photoSource = photoSource;
+    enriched.push(s);
+  }
+
+  return enriched;
+}

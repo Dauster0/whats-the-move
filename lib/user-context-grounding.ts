@@ -87,9 +87,31 @@ export function scoreCandidateForPreferences(
     const i = interest.toLowerCase().replace(/-/g, " ");
     if (i.includes("coffee") && (cat.includes("coffee") || cat === "cafe")) s += 9;
     if ((i.includes("walk") || i.includes("beach")) && (cat === "park" || cat === "scenic" || cat === "trail")) s += 9;
+    if (i.includes("hike") && (cat === "park" || cat === "scenic" || cat === "trail" || /hike|trail|summit|overlook/.test(blob))) {
+      s += 11;
+    }
     if (i.includes("museum") && cat === "museum") s += 10;
     if (i.includes("bookstore") && cat === "bookstore") s += 10;
     if (i.includes("comedy") && cat === "comedy") s += 10;
+    if (i.includes("improv") && (cat === "comedy" || /improv|open mic|stand up/.test(blob))) s += 11;
+    if (i.includes("karaoke") && (cat === "bar" || cat === "nightclub" || /karaoke/.test(blob))) s += 11;
+    if (i.includes("danc") && (cat === "nightclub" || cat === "live_music" || /salsa|bachata|dance floor|dancing/.test(blob))) {
+      s += 10;
+    }
+    if (i.includes("trivia") && (cat === "bar" || cat === "restaurant" || /trivia/.test(blob))) s += 9;
+    if (i.includes("theater") || i.includes("theatre")) {
+      if (["theater", "theatre", "live_performance", "movie_theater"].includes(cat) || /play\b|musical|broadway/.test(blob)) {
+        s += 9;
+      }
+    }
+    if (i.includes("live music") && (cat === "live_music" || cat === "live_performance")) s += 11;
+    if (i.includes("concert") && (cat === "live_music" || cat === "sports_event" || /concert|tour\b|arena|amphitheatre|amphitheater/.test(blob))) {
+      s += 11;
+    }
+    if (i.includes("farmers") && (cat === "market" || /farmers market|flea/.test(blob))) s += 9;
+    if (i.includes("rooftop") && (cat === "bar" || cat === "restaurant" || /rooftop|skyline/.test(blob))) s += 9;
+    if (i.includes("bowling") && cat === "bowling") s += 10;
+    if (i.includes("arcade") && cat === "arcade") s += 10;
     if (i.includes("nightlife") && (cat === "bar" || cat === "nightclub" || cat === "live_music")) s += 8;
     if (i.includes("movie") && (cat === "movie_theater" || cat === "cinema")) s += 8;
     if (i.includes("sport") && cat === "sports_event") s += 10;
