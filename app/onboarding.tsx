@@ -53,6 +53,10 @@ export default function OnboardingScreen() {
     energyMode: "mixed",
     placeMode: "both",
     preferredTimes: ["morning", "midday", "afternoon", "evening", "night"],
+    homeCity: "",
+    schoolOrWork: "",
+    ageRange: "prefer_not",
+    socialBattery: "ambivert",
   });
 
   function toggleInterest(value: string) {
@@ -138,7 +142,7 @@ export default function OnboardingScreen() {
             These make the app more realistic, not just more personalized.
           </Text>
 
-          <SectionLabel label="Social mode" />
+          <SectionLabel label="Social mode" styles={styles} />
           <ChoiceRow
             options={["solo", "social", "both"]}
             value={preferences.socialMode}
@@ -148,9 +152,10 @@ export default function OnboardingScreen() {
                 socialMode: value as UserPreferences["socialMode"],
               }))
             }
+            styles={styles}
           />
 
-          <SectionLabel label="Budget" />
+          <SectionLabel label="Budget" styles={styles} />
           <ChoiceRow
             options={["free", "cheap", "flexible"]}
             value={preferences.budget}
@@ -160,9 +165,10 @@ export default function OnboardingScreen() {
                 budget: value as UserPreferences["budget"],
               }))
             }
+            styles={styles}
           />
 
-          <SectionLabel label="Energy" />
+          <SectionLabel label="Energy" styles={styles} />
           <ChoiceRow
             options={["low", "medium", "high", "mixed"]}
             value={preferences.energyMode}
@@ -172,9 +178,10 @@ export default function OnboardingScreen() {
                 energyMode: value as UserPreferences["energyMode"],
               }))
             }
+            styles={styles}
           />
 
-          <SectionLabel label="Place type" />
+          <SectionLabel label="Place type" styles={styles} />
           <ChoiceRow
             options={["indoors", "outdoors", "both"]}
             value={preferences.placeMode}
@@ -184,6 +191,7 @@ export default function OnboardingScreen() {
                 placeMode: value as UserPreferences["placeMode"],
               }))
             }
+            styles={styles}
           />
         </>
       )}
@@ -267,7 +275,13 @@ export default function OnboardingScreen() {
   );
 }
 
-function SectionLabel({ label }: { label: string }) {
+function SectionLabel({
+  label,
+  styles,
+}: {
+  label: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return <Text style={styles.sectionLabel}>{label}</Text>;
 }
 
@@ -275,10 +289,12 @@ function ChoiceRow({
   options,
   value,
   onSelect,
+  styles,
 }: {
   options: string[];
   value: string;
   onSelect: (value: string) => void;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.choiceRow}>

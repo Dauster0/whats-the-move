@@ -20,6 +20,23 @@ export function isNightlifeTime(date: Date = new Date()): boolean {
   return hour >= 18 || hour < 3; // 6pm-3am
 }
 
+/**
+ * After 9 PM local time — avoid family venues / places that are usually closed or closing.
+ */
+export function isLateNightOutHours(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  return hour >= 21 || hour < 3;
+}
+
+/**
+ * After midnight through early morning (~before 6 AM) — real late-night moves (food, bars,
+ * beach, clubs), not museum or brunch energy.
+ */
+export function isWeeHours(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  return hour >= 0 && hour < 6;
+}
+
 /** Human-readable context for AI prompts. */
 export function getTimeContext(date: Date = new Date()): string {
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

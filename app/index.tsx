@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
@@ -317,6 +317,15 @@ export default function HomeScreen() {
           title="Edit interests"
           subtitle="Customize suggestions"
           onPress={() => router.push("/edit-interests")}
+          iconTint="muted"
+          colors={colors}
+          styles={styles}
+        />
+        <OptionCard
+          icon="person"
+          title="Your context"
+          subtitle="Home area, school, budget fit, introvert or extrovert"
+          onPress={() => router.push("/my-context" as Href)}
           iconTint="muted"
           colors={colors}
           styles={styles}

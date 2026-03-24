@@ -5,10 +5,15 @@ import {
   searchLiveEvents,
 } from "./live-event-search";
 import {
+  isEventDependentVenueCategory,
+  verifySameDayLiveListingForPlace,
+} from "./event-venue-gate";
+import {
   GenericPlaceResult,
   GenericPlaceType,
   searchNearbyGenericPlaces,
 } from "./live-place-search";
+import { isWeeHours } from "./time-of-day";
 
 export type MoveCategory = "micro" | "short" | "social";
 
@@ -68,6 +73,7 @@ export type EngineSuggestion =
       externalUrl?: string;
       dateText?: string;
       startTimeText?: string;
+      hoursSummary?: string;
     };
 
 function randomJitter() {
@@ -151,12 +157,28 @@ export function choosePrimaryIntents(
     else intents.push("local_explore", "experience");
   }
 
+  let result = [...intents];
   if (timeOfDay === "night") {
-    const filtered = intents.filter((x) => x !== "active_movement");
-    return filtered.length > 0 ? uniq(filtered) : uniq(intents);
+    const filtered = result.filter((x) => x !== "active_movement");
+    result = filtered.length > 0 ? filtered : result;
   }
 
-  return uniq(intents);
+  result = uniq(result);
+
+  const battery = preferences.socialBattery ?? "ambivert";
+  if (battery === "introvert" && maxMinutes < 35) {
+    result = result.filter((x) => x !== "social_ping");
+  }
+  if (
+    battery === "extrovert" &&
+    preferences.socialMode !== "solo" &&
+    maxMinutes >= 12 &&
+    !result.includes("social_ping")
+  ) {
+    result.push("social_ping");
+  }
+
+  return uniq(result);
 }
 
 function buildInstantMoves(context: SuggestionContext): EngineSuggestion[] {
@@ -373,7 +395,16 @@ function mapIntentToPlaceCategories(
   if (preferences.interests.includes("cheap-hangouts")) categories.push("park", "market", "coffee");
 
   if (timeOfDay === "night") {
-    categories.push("movie_theater", "comedy", "live_music", "dessert");
+    categories.push(
+      "movie_theater",
+      "comedy",
+      "live_music",
+      "dessert",
+      "bar",
+      "nightclub",
+      "restaurant",
+      "scenic"
+    );
   }
 
   return uniq(categories);
@@ -402,23 +433,25 @@ function formatPlaceSuggestion(
 ): EngineSuggestion {
   const why =
     place.whyItFits ||
-    `Specific destination, realistic for ${context.maxMinutes} minutes, and a better use of your time than default scrolling.`;
+    `Feels doable in about ${context.maxMinutes} minutes and beats another night of scrolling.`;
 
   const subtitleMap: Record<GenericPlaceType, string> = {
-    coffee: "A simple café reset",
-    dessert: "A quick treat that feels like going somewhere",
-    bookstore: "A calmer place to wander with intention",
-    museum: "A real outing without needing a huge plan",
-    park: "A low-effort outdoor reset",
-    comedy: "A spontaneous live comedy idea",
-    bowling: "A fun outing with actual structure",
-    arcade: "A playful break that feels different from screen time",
-    movie_theater: "A real immersive break",
+    coffee: "Easy reset with good coffee",
+    dessert: "A sweet excuse to actually leave",
+    bookstore: "Slow wander with real books in your hands",
+    museum: "A real outing without a big plan",
+    park: "Low effort outdoor reset",
+    comedy: "Live comedy when the lineup lands on your card",
+    bowling: "Structured fun that still feels easy",
+    arcade: "Feels different from another night on your phone",
+    movie_theater: "Big screen night out",
     live_music: "Live music nearby",
-    gallery: "A small creative outing",
-    scenic: "A place worth going just for the atmosphere",
-    market: "A walkable destination with energy",
-    restaurant: "An actual meal plan instead of drifting",
+    gallery: "Small creative outing",
+    scenic: "Worth going for the vibe alone",
+    market: "Walkable spot with real energy",
+    restaurant: "Sit down meal instead of drifting",
+    bar: "Drinks, karaoke, or a real bar stool night out",
+    nightclub: "Loud music and a crowd worth dressing for",
   };
 
   let duration = 45;
@@ -448,15 +481,25 @@ function formatPlaceSuggestion(
     case "comedy":
       duration = 90;
       break;
+    case "bar":
+    case "nightclub":
+      duration = 90;
+      break;
     default:
       duration = 60;
   }
+
+  const baseSub = subtitleMap[place.category];
+  const hoursSummary =
+    typeof place.hoursSummary === "string" && place.hoursSummary.trim().length > 0
+      ? place.hoursSummary.trim()
+      : undefined;
 
   return {
     id: place.id,
     type: "place",
     title: `Go to ${place.name}`,
-    subtitle: subtitleMap[place.category],
+    subtitle: baseSub,
     reason: why,
     category: "short",
     durationMinutes: duration,
@@ -469,6 +512,7 @@ function formatPlaceSuggestion(
     reservationNote: place.reservationNote,
     rating: place.rating,
     openNow: place.openNow,
+    hoursSummary,
     tags: [
       place.category === "park" || place.category === "scenic" ? "outdoor" : "indoor",
       duration >= 60 ? "experience" : "quick outing",
@@ -478,20 +522,25 @@ function formatPlaceSuggestion(
 }
 
 function formatEventSuggestion(event: LiveEventResult): EngineSuggestion {
-  const subtitleMap: Record<LiveEventResult["category"], string> = {
-    comedy: "A live comedy pick",
-    live_music: "Live music nearby",
-    movie_event: "A movie-style event",
-    sports_event: "A live sports outing",
-    theater: "A theater plan nearby",
-  };
+  const v = event.venueName || "the venue";
+  const n = event.name || "Show";
+  const headline =
+    event.startTimeText && String(event.startTimeText).trim().length > 0
+      ? `${n} at ${v}, ${event.startTimeText}`
+      : `${n} tonight at ${v}`;
+  const subtitle =
+    event.dateText && event.startTimeText
+      ? `${n}, ${event.dateText}, ${event.startTimeText}`
+      : event.startTimeText
+        ? `${n}, ${event.startTimeText}`
+        : `${n}, ticketed night out`;
 
   return {
     id: `event-${event.id}`,
     type: "place",
-    title: `Go to ${event.venueName} for ${event.name}`,
-    subtitle: subtitleMap[event.category],
-    reason: `Happening ${event.dateText} at ${event.startTimeText}. This is a real event, not just a vague idea.`,
+    title: headline,
+    subtitle,
+    reason: `Real show at a real venue. ${event.dateText ? `${event.dateText}. ` : ""}${event.startTimeText ? `${event.startTimeText}.` : "Tonight."}`,
     category: "short",
     durationMinutes: 90,
     placeCategory: event.category,
@@ -504,7 +553,20 @@ function formatEventSuggestion(event: LiveEventResult): EngineSuggestion {
     externalUrl: event.url,
     dateText: event.dateText,
     startTimeText: event.startTimeText,
-    tags: ["experience", "timed-event", "indoor", "destination"],
+    tags: [
+      "experience",
+      "timed-event",
+      "destination",
+      event.category === "comedy"
+        ? "comedy"
+        : event.category === "live_music"
+          ? "live-music"
+          : event.category === "theater"
+            ? "theater"
+            : event.category === "sports_event"
+              ? "sports"
+              : "night-out",
+    ],
   };
 }
 
@@ -592,6 +654,7 @@ async function buildExperienceEngine(
           lng: context.lng,
           categories: liveEventCategories,
           size: 4,
+          nowMs: Date.now(),
         })
       : [];
 
@@ -760,12 +823,34 @@ export async function buildEngineSuggestions(
   const placeResults = await searchNearbyGenericPlaces({
     area: context.area,
     categories: placeCategories,
-    maxPerCategory: 2,
+    maxPerCategory: isWeeHours() ? 3 : 2,
     lat: context.lat,
     lng: context.lng,
+    weeHours: isWeeHours(),
   });
 
-  const placeSuggestions = placeResults.map((p) => formatPlaceSuggestion(p, context));
+  const listingNowMs = Date.now();
+  const placeResultsWithListings: GenericPlaceResult[] = [];
+  for (const p of placeResults) {
+    if (!isEventDependentVenueCategory(p.category)) {
+      placeResultsWithListings.push(p);
+      continue;
+    }
+    if (
+      await verifySameDayLiveListingForPlace(p, {
+        area: context.area,
+        lat: context.lat,
+        lng: context.lng,
+        nowMs: listingNowMs,
+      })
+    ) {
+      placeResultsWithListings.push(p);
+    }
+  }
+
+  const placeSuggestions = placeResultsWithListings.map((p) =>
+    formatPlaceSuggestion(p, context)
+  );
 
   const liveEventCategories =
     context.maxMinutes >= 45 ? pickLiveEventCategories(context) : [];
@@ -778,6 +863,7 @@ export async function buildEngineSuggestions(
           lng: context.lng,
           categories: liveEventCategories,
           size: 3,
+          nowMs: Date.now(),
         })
       : [];
 

@@ -504,6 +504,14 @@ export default function SuggestionsScreen() {
                 <Text style={styles.metaText}>{move.distanceText}</Text>
                 <Text style={styles.metaDot}>·</Text>
                 <Text style={styles.metaText}>{move.priceText}</Text>
+                {move.hoursSummary ? (
+                  <>
+                    <Text style={styles.metaDot}>·</Text>
+                    <Text style={styles.metaText} numberOfLines={2}>
+                      {move.hoursSummary}
+                    </Text>
+                  </>
+                ) : null}
               </>
             ) : null}
           </View>
@@ -624,6 +632,13 @@ export default function SuggestionsScreen() {
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Start time</Text>
                     <Text style={styles.infoValue}>{move.startTimeText}</Text>
+                  </View>
+                ) : null}
+
+                {move.hoursSummary ? (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Hours</Text>
+                    <Text style={styles.infoValue}>{move.hoursSummary}</Text>
                   </View>
                 ) : null}
 

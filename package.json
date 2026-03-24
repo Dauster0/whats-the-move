@@ -5,6 +5,8 @@
   "scripts": {
     "check-apis": "cd server && node check-apis.js",
     "start": "expo start",
+    "start:offline": "expo start --offline",
+    "start:clear": "expo start --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

@@ -21,6 +21,13 @@ export type LiveEventResult = {
   reservationNote?: string;
 };
 
+import {
+  filterTicketmasterEventsForImmediateOuting,
+  filterUpcomingTicketmasterEvents,
+  getEventStartTimezone,
+  pickBestTicketmasterEvent,
+} from "./ticketmaster-pick";
+
 const TICKETMASTER_API_KEY = process.env.EXPO_PUBLIC_TICKETMASTER_API_KEY;
 
 function formatPrice(segmentName?: string): "$" | "$$" | "$$$" {
@@ -98,13 +105,14 @@ function formatDate(date?: string) {
   });
 }
 
-function formatTime(date?: string) {
+function formatTime(date?: string, timeZone?: string) {
   if (!date) return "Later today";
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return "Later today";
-  return d.toLocaleTimeString([], {
+  return d.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 }
 
@@ -114,8 +122,10 @@ export async function searchLiveEvents(params: {
   lng?: number;
   categories: LiveEventCategory[];
   size?: number;
+  /** Wall-clock "now" for same-day / not-past filtering (device time). */
+  nowMs?: number;
 }): Promise<LiveEventResult[]> {
-  const { area, lat, lng, categories, size = 5 } = params;
+  const { area, lat, lng, categories, size = 5, nowMs = Date.now() } = params;
 
   if (!TICKETMASTER_API_KEY) return [];
 
@@ -143,7 +153,11 @@ export async function searchLiveEvents(params: {
       if (!res.ok) continue;
 
       const data = await res.json();
-      const events = data?._embedded?.events ?? [];
+      const raw = data?._embedded?.events ?? [];
+      const events = filterTicketmasterEventsForImmediateOuting(
+        filterUpcomingTicketmasterEvents(raw, nowMs),
+        nowMs
+      );
 
       for (const event of events) {
         const venue = event?._embedded?.venues?.[0];
@@ -170,7 +184,10 @@ export async function searchLiveEvents(params: {
             area ||
             "Nearby venue",
           distanceText: metersToMilesText(distanceMeters),
-          startTimeText: formatTime(event?.dates?.start?.dateTime),
+          startTimeText: formatTime(
+            event?.dates?.start?.dateTime,
+            getEventStartTimezone(event)
+          ),
           dateText: formatDate(event?.dates?.start?.localDate),
           priceText: formatPrice(event?.classifications?.[0]?.segment?.name),
           url: event?.url,
@@ -192,13 +209,13 @@ async function fetchEventsForKeyword(
   area?: string,
   lat?: number,
   lng?: number
-): Promise<any | null> {
-  if (!TICKETMASTER_API_KEY || !keyword || keyword.length < 2) return null;
+): Promise<any[]> {
+  if (!TICKETMASTER_API_KEY || !keyword || keyword.length < 2) return [];
   try {
     const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json");
     url.searchParams.set("apikey", TICKETMASTER_API_KEY);
     url.searchParams.set("keyword", keyword);
-    url.searchParams.set("size", "5");
+    url.searchParams.set("size", "50");
     url.searchParams.set("sort", "date,asc");
 
     if (lat != null && lng != null) {
@@ -210,23 +227,12 @@ async function fetchEventsForKeyword(
     }
 
     const res = await fetch(url.toString());
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
-    const events = data?._embedded?.events ?? [];
-    return events[0] ?? null;
+    return data?._embedded?.events ?? [];
   } catch {
-    return null;
+    return [];
   }
-}
-
-function venueNameMatchesEvent(venueName: string, eventVenue: string): boolean {
-  const v = venueName.toLowerCase().replace(/\s+/g, " ");
-  const e = (eventVenue || "").toLowerCase().replace(/\s+/g, " ");
-  if (e.includes(v) || v.includes(e)) return true;
-  const vWords = v.split(/\s+/).filter((w) => w.length > 2);
-  const eWords = e.split(/\s+/).filter((w) => w.length > 2);
-  const matchCount = vWords.filter((w) => e.includes(w)).length;
-  return matchCount >= Math.min(2, vWords.length);
 }
 
 export async function searchEventsForVenue(params: {
@@ -234,66 +240,79 @@ export async function searchEventsForVenue(params: {
   area?: string;
   lat?: number;
   lng?: number;
+  /** Match performer/show name from card title (e.g. "Mo Amer" from "Brea Improv — Mo Amer at 7 PM"). */
+  eventNameHint?: string;
+  nowMs?: number;
 }): Promise<LiveEventResult | null> {
-  const { venueName, area, lat, lng } = params;
+  const { venueName, area, lat, lng, eventNameHint = "", nowMs = Date.now() } = params;
   if (!venueName || venueName.length < 3) return null;
 
+  const vn = venueName.trim();
+
   const keywordsToTry = [
-    venueName,
-    venueName.replace(/\s+(Theater|Theatre|Cinema|Theatre)\s*$/i, "").trim(),
-    venueName.split(/\s+/).slice(0, 3).join(" "),
-    venueName.split(/\s+/).slice(0, 2).join(" "),
+    vn,
+    vn.replace(/\s+(Theater|Theatre|Cinema)\s*$/i, "").trim(),
+    vn.split(/\s+/).slice(0, 3).join(" "),
+    vn.split(/\s+/).slice(0, 2).join(" "),
   ].filter((k) => k.length >= 3);
 
-  const seen = new Set<string>();
+  const seenKw = new Set<string>();
   const uniqueKeywords = keywordsToTry.filter((k) => {
     const key = k.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seenKw.has(key)) return false;
+    seenKw.add(key);
     return true;
   });
 
+  const allEvents: any[] = [];
+  const seenIds = new Set<string>();
   for (const keyword of uniqueKeywords) {
-    const event = await fetchEventsForKeyword(keyword, area, lat, lng);
-    if (!event) continue;
-
-    const eventVenue = event?._embedded?.venues?.[0]?.name ?? "";
-    if (venueNameMatchesEvent(venueName, eventVenue)) {
-
-      const venue = event?._embedded?.venues?.[0];
-      const venueLat = venue?.location?.latitude
-        ? Number(venue.location.latitude)
-        : undefined;
-      const venueLng = venue?.location?.longitude
-        ? Number(venue.location.longitude)
-        : undefined;
-      const distanceMeters =
-        lat != null && lng != null
-          ? haversineMeters(lat, lng, venueLat, venueLng)
-          : undefined;
-      const eventName = event.name ?? "Live event";
-      if (!eventName || eventName === "Live event") continue;
-
-      return {
-        id: event.id,
-        name: eventName,
-        category: "theater",
-        venueName: venue?.name ?? venueName,
-        address:
-          venue?.address?.line1 ||
-          venue?.city?.name ||
-          area ||
-          "Nearby venue",
-        distanceText: metersToMilesText(distanceMeters),
-        startTimeText: formatTime(event?.dates?.start?.dateTime),
-        dateText: formatDate(event?.dates?.start?.localDate),
-        priceText: formatPrice(event?.classifications?.[0]?.segment?.name),
-        url: event?.url,
-        mapQuery: venue?.name ?? venueName,
-        reservationNeeded: true,
-        reservationNote: "Check tickets before you go.",
-      };
+    const events = await fetchEventsForKeyword(keyword, area, lat, lng);
+    for (const ev of events) {
+      const id = ev?.id;
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      allEvents.push(ev);
     }
   }
-  return null;
+
+  const best = pickBestTicketmasterEvent(allEvents, venueName, eventNameHint, nowMs);
+  if (!best) return null;
+
+  const venue = best?._embedded?.venues?.[0];
+  const venueLat = venue?.location?.latitude
+    ? Number(venue.location.latitude)
+    : undefined;
+  const venueLng = venue?.location?.longitude
+    ? Number(venue.location.longitude)
+    : undefined;
+  const distanceMeters =
+    lat != null && lng != null
+      ? haversineMeters(lat, lng, venueLat, venueLng)
+      : undefined;
+  const eventName = best.name ?? "Live event";
+  if (!eventName || eventName === "Live event") return null;
+
+  return {
+    id: best.id,
+    name: eventName,
+    category: "theater",
+    venueName: venue?.name ?? venueName,
+    address:
+      venue?.address?.line1 ||
+      venue?.city?.name ||
+      area ||
+      "Nearby venue",
+    distanceText: metersToMilesText(distanceMeters),
+    startTimeText: formatTime(
+      best?.dates?.start?.dateTime,
+      getEventStartTimezone(best)
+    ),
+    dateText: formatDate(best?.dates?.start?.localDate),
+    priceText: formatPrice(best?.classifications?.[0]?.segment?.name),
+    url: best?.url,
+    mapQuery: venue?.name ?? venueName,
+    reservationNeeded: true,
+    reservationNote: "Check tickets before you go.",
+  };
 }

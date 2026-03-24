@@ -24,6 +24,13 @@ export type UserPreferences = {
   energyMode: "low" | "medium" | "high" | "mixed";
   placeMode: "indoors" | "outdoors" | "both";
   preferredTimes: ("morning" | "midday" | "afternoon" | "evening" | "night")[];
+  /** Neighborhood or city — used in AI copy & booking search context */
+  homeCity: string;
+  /** School, campus, or work area — optional anchor for “near campus” style ideas */
+  schoolOrWork: string;
+  ageRange: "under18" | "18-24" | "25-34" | "35-44" | "45+" | "prefer_not";
+  /** Separate from socialMode: introverts get fewer “ping a friend” nudges */
+  socialBattery: "introvert" | "ambivert" | "extrovert";
 };
 
 type MoveContextType = {
@@ -50,7 +57,7 @@ type MoveContextType = {
 const MoveContext = createContext<MoveContextType | undefined>(undefined);
 
 const MOVES_STORAGE_KEY = "completed_moves";
-const PREFERENCES_STORAGE_KEY = "user_preferences_v2";
+const PREFERENCES_STORAGE_KEY = "user_preferences_v3";
 const ONBOARDING_STORAGE_KEY = "has_finished_onboarding";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -60,6 +67,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   energyMode: "mixed",
   placeMode: "both",
   preferredTimes: ["morning", "midday", "afternoon", "evening", "night"],
+  homeCity: "",
+  schoolOrWork: "",
+  ageRange: "prefer_not",
+  socialBattery: "ambivert",
 };
 
 function getStartOfDay(date: Date) {
@@ -138,6 +149,24 @@ export function MoveProvider({ children }: { children: ReactNode }) {
             preferredTimes: Array.isArray(parsed?.preferredTimes)
               ? parsed.preferredTimes
               : DEFAULT_PREFERENCES.preferredTimes,
+            homeCity: typeof parsed?.homeCity === "string" ? parsed.homeCity : "",
+            schoolOrWork:
+              typeof parsed?.schoolOrWork === "string" ? parsed.schoolOrWork : "",
+            ageRange:
+              parsed?.ageRange === "under18" ||
+              parsed?.ageRange === "18-24" ||
+              parsed?.ageRange === "25-34" ||
+              parsed?.ageRange === "35-44" ||
+              parsed?.ageRange === "45+" ||
+              parsed?.ageRange === "prefer_not"
+                ? parsed.ageRange
+                : "prefer_not",
+            socialBattery:
+              parsed?.socialBattery === "introvert" ||
+              parsed?.socialBattery === "ambivert" ||
+              parsed?.socialBattery === "extrovert"
+                ? parsed.socialBattery
+                : "ambivert",
           });
         }
 
