@@ -11,7 +11,7 @@ import express from "express";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, "..", ".env") });
-config({ path: path.join(__dirname, ".env") });
+config({ path: path.join(__dirname, ".env"), override: true });
 
 const app = express();
 

@@ -1,3 +1,5 @@
+import { isGroceryOrErrandPlace } from "./place-filters";
+
 export type GenericPlaceType =
   | "coffee"
   | "dessert"
@@ -10,6 +12,7 @@ export type GenericPlaceType =
   | "movie_theater"
   | "live_music"
   | "nightclub"
+  | "bar"
   | "gallery"
   | "scenic"
   | "market"
@@ -27,12 +30,108 @@ export type GenericPlaceResult = {
   reservationNote?: string;
   rating?: number;
   openNow?: boolean;
+  /** e.g. "Open until 10:00 PM" or "Today 11:00 AM – 2:00 AM" from Google hours */
+  hoursSummary?: string;
   whyItFits?: string;
   lat?: number;
   lng?: number;
 };
 
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+/** Field mask for list/search: hours for “open until” copy (uses nextCloseTime when open). */
+const PLACES_LIST_FIELD_MASK =
+  "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.priceLevel,places.currentOpeningHours,places.regularOpeningHours";
+
+/**
+ * Builds one line for UI from Google Places OpeningHours (new API).
+ * Prefers `nextCloseTime` when the place is open; falls back to today's weekday line.
+ */
+export function openingHoursLineFromGooglePlace(place: {
+  currentOpeningHours?: {
+    openNow?: boolean;
+    nextCloseTime?: string;
+    nextOpenTime?: string;
+    weekdayDescriptions?: string[];
+  };
+  regularOpeningHours?: {
+    openNow?: boolean;
+    weekdayDescriptions?: string[];
+  };
+}): string | undefined {
+  const cur = place.currentOpeningHours;
+  const reg = place.regularOpeningHours;
+
+  if (cur?.nextCloseTime) {
+    const d = new Date(cur.nextCloseTime);
+    if (!Number.isNaN(d.getTime())) {
+      const t = d.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      return `Open until ${t}`;
+    }
+  }
+
+  if (cur?.openNow && !cur?.nextCloseTime) {
+    const blob = [
+      ...(cur.weekdayDescriptions ?? []),
+      ...(reg?.weekdayDescriptions ?? []),
+    ].join(" ");
+    if (/24\s*hours?|always\s*open|open\s*24/i.test(blob)) {
+      return "Open 24 hours";
+    }
+  }
+
+  if (cur && cur.openNow === false && cur.nextOpenTime) {
+    const d = new Date(cur.nextOpenTime);
+    if (!Number.isNaN(d.getTime())) {
+      const t = d.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      return `Closed · opens ${t}`;
+    }
+  }
+
+  const lines = reg?.weekdayDescriptions ?? cur?.weekdayDescriptions;
+  if (lines?.length) {
+    return todayHoursFromWeekdayDescriptions(lines, new Date());
+  }
+
+  return undefined;
+}
+
+function todayHoursFromWeekdayDescriptions(
+  lines: string[],
+  now: Date
+): string | undefined {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const short = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayIdx = now.getDay();
+  const full = days[dayIdx];
+  const sh = short[dayIdx];
+  const line = lines.find((l) => {
+    const t = l.trim();
+    return t.startsWith(full) || new RegExp(`^${sh}\\b`, "i").test(t);
+  });
+  if (!line && lines[dayIdx]) {
+    return `Hours: ${lines[dayIdx]}`;
+  }
+  if (!line) return undefined;
+  const afterColon = line.includes(":")
+    ? line.replace(/^[^:]+:\s*/, "").trim()
+    : line.trim();
+  return `Today ${afterColon}`;
+}
 
 function metersToMilesText(meters?: number) {
   if (!meters || Number.isNaN(meters)) return "Nearby";
@@ -98,12 +197,15 @@ function googleIncludedTypes(category: GenericPlaceType): string[] {
       return ["live_music_venue"];
     case "nightclub":
       return ["night_club"];
+    case "bar":
+      return ["bar"];
     case "gallery":
       return ["art_gallery"];
     case "scenic":
       return ["tourist_attraction", "observation_deck"];
     case "market":
-      return ["market", "shopping_mall"];
+      /* shopping_mall often surfaces mall anchors (grocery) — prefer real markets */
+      return ["market"];
     case "restaurant":
       return ["restaurant"];
     default:
@@ -111,7 +213,7 @@ function googleIncludedTypes(category: GenericPlaceType): string[] {
   }
 }
 
-function categoryQuery(category: GenericPlaceType, area: string) {
+function categoryQuery(category: GenericPlaceType, area: string, weeHours?: boolean) {
   switch (category) {
     case "coffee":
       return `best coffee shops in ${area}`;
@@ -122,7 +224,9 @@ function categoryQuery(category: GenericPlaceType, area: string) {
     case "museum":
       return `museums in ${area}`;
     case "park":
-      return `parks in ${area}`;
+      return weeHours
+        ? `beach parks waterfront walking paths in ${area}`
+        : `parks in ${area}`;
     case "comedy":
       return `comedy clubs in ${area}`;
     case "bowling":
@@ -134,11 +238,19 @@ function categoryQuery(category: GenericPlaceType, area: string) {
     case "live_music":
       return `live music venues in ${area}`;
     case "nightclub":
-      return `nightclubs in ${area}`;
+      return weeHours
+        ? `nightclubs dance clubs open late in ${area}`
+        : `nightclubs in ${area}`;
+    case "bar":
+      return weeHours
+        ? `karaoke bars pubs late night bars in ${area}`
+        : `bars pubs in ${area}`;
     case "gallery":
       return `art galleries in ${area}`;
     case "scenic":
-      return `sunset viewpoints in ${area}`;
+      return weeHours
+        ? `beach pier ocean boardwalk night views in ${area}`
+        : `sunset viewpoints in ${area}`;
     case "market":
       return `markets in ${area}`;
     case "restaurant":
@@ -165,8 +277,61 @@ function defaultReservationNeeded(category: GenericPlaceType) {
     category === "comedy" ||
     category === "live_music" ||
     category === "movie_theater" ||
-    category === "nightclub"
+    category === "nightclub" ||
+    category === "bar"
   );
+}
+
+/**
+ * Comedy search uses performing_arts_theater — that also returns symphonies, opera houses,
+ * and concert halls. Those are not comedy clubs; label them live_music so copy, photos, and
+ * Ticketmaster enrichment match.
+ */
+export function isLikelySymphonyOrConcertHallName(name: string): boolean {
+  const n = String(name || "").toLowerCase();
+  if (
+    /\b(concert hall|symphony hall|orchestra hall|philharmonic)\b/.test(n) ||
+    /\b(music hall|performance hall|recital hall|symphony center)\b/.test(n) ||
+    /\b(performing arts center|performing arts hall)\b/.test(n) ||
+    /\bopera house\b/.test(n) ||
+    /\b(amphitheatre|amphitheater)\b/.test(n) ||
+    (/\bopera\b/.test(n) && /\b(house|hall|theater|theatre|center|ballet)\b/.test(n))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Google often tags famous food halls as tourist_attraction → our "scenic" search.
+ * Fix category so copy + Unsplash queries match (indoor market, not beach sunset).
+ */
+export function normalizePlaceCategoryString(name: string, category: string): string {
+  const n = String(name || "").toLowerCase();
+  if (isLikelySymphonyOrConcertHallName(name)) {
+    return "live_music";
+  }
+  if (
+    /\bgrand central market\b/.test(n) ||
+    /\banaheim packing (house|district)\b/.test(n) ||
+    /\bmercado la paloma\b/.test(n)
+  ) {
+    return "market";
+  }
+  if (
+    category === "scenic" &&
+    /\b(market|mercado|food hall|public market|bazaar)\b/.test(n)
+  ) {
+    return "market";
+  }
+  return category;
+}
+
+export function normalizePlaceCategory(
+  name: string,
+  category: GenericPlaceType
+): GenericPlaceType {
+  return normalizePlaceCategoryString(name, category) as GenericPlaceType;
 }
 
 async function nearbySearch(params: {
@@ -199,8 +364,7 @@ async function nearbySearch(params: {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY ?? "",
-        "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.regularOpeningHours.openNow,places.priceLevel",
+        "X-Goog-FieldMask": PLACES_LIST_FIELD_MASK,
       },
       body: JSON.stringify(body),
     }
@@ -216,11 +380,12 @@ async function textSearch(params: {
   area: string;
   category: GenericPlaceType;
   maxResultCount?: number;
+  weeHours?: boolean;
 }) {
   if (!GOOGLE_PLACES_API_KEY) return [];
 
   const body = {
-    textQuery: categoryQuery(params.category, params.area),
+    textQuery: categoryQuery(params.category, params.area, params.weeHours),
     maxResultCount: params.maxResultCount ?? 4,
   };
 
@@ -231,8 +396,7 @@ async function textSearch(params: {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY ?? "",
-        "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.regularOpeningHours.openNow,places.priceLevel",
+        "X-Goog-FieldMask": PLACES_LIST_FIELD_MASK,
       },
       body: JSON.stringify(body),
     }
@@ -244,16 +408,30 @@ async function textSearch(params: {
   return Array.isArray(data.places) ? data.places : [];
 }
 
+function shufflePlaces<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export async function searchNearbyGenericPlaces(params: {
   area: string;
   categories: GenericPlaceType[];
   maxPerCategory?: number;
   lat?: number;
   lng?: number;
+  /** After midnight ~5 AM: better text queries for late-night food, beach, bars */
+  weeHours?: boolean;
 }): Promise<GenericPlaceResult[]> {
-  const { area, categories, maxPerCategory = 3, lat, lng } = params;
+  const { area, categories, maxPerCategory = 3, lat, lng, weeHours } = params;
 
   const all: GenericPlaceResult[] = [];
+
+  /** Google returns popularity order — same top N every session. Pull a wider pool, shuffle, then slice. */
+  const poolSize = Math.min(20, Math.max(maxPerCategory * 4, maxPerCategory + 6));
 
   for (const category of categories) {
     const rawPlaces =
@@ -262,15 +440,18 @@ export async function searchNearbyGenericPlaces(params: {
             lat,
             lng,
             category,
-            maxResultCount: maxPerCategory,
+            maxResultCount: poolSize,
           })
         : await textSearch({
             area,
             category,
-            maxResultCount: maxPerCategory,
+            maxResultCount: poolSize,
+            weeHours,
           });
 
-    for (const place of rawPlaces) {
+    const picked = shufflePlaces(rawPlaces).slice(0, maxPerCategory);
+
+    for (const place of picked) {
       const pLat = place.location?.latitude;
       const pLng = place.location?.longitude;
       const distanceMeters =
@@ -279,11 +460,19 @@ export async function searchNearbyGenericPlaces(params: {
           : undefined;
 
       const name = place.displayName?.text ?? "Nearby place";
+      if (isGroceryOrErrandPlace(name, "", category)) continue;
+
+      const resolvedCategory = normalizePlaceCategory(name, category);
+
+      const openNow =
+        place.currentOpeningHours?.openNow ??
+        place.regularOpeningHours?.openNow;
+      const hoursSummary = openingHoursLineFromGooglePlace(place);
 
       all.push({
-        id: place.id ?? `${category}-${name}`,
+        id: place.id ?? `${resolvedCategory}-${name}`,
         name,
-        category,
+        category: resolvedCategory,
         address: place.formattedAddress ?? area,
         mapQuery: name,
         distanceText: metersToMilesText(distanceMeters),
@@ -293,7 +482,8 @@ export async function searchNearbyGenericPlaces(params: {
           ? "Worth checking availability first."
           : undefined,
         rating: place.rating,
-        openNow: place.regularOpeningHours?.openNow,
+        openNow,
+        hoursSummary,
         lat: pLat,
         lng: pLng,
       });

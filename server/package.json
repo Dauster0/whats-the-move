@@ -4,12 +4,11 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node --import ./load-env.js index.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "expo-location": "~19.0.8",
     "express": "^5.2.1",
     "openai": "^6.27.0"
   },

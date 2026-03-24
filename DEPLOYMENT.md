@@ -1,42 +1,6 @@
 # Complete Deployment Guide
 
-Use **Railway** for the server (simple, free tier, auto-deploys from GitHub).
-
----
-
-## Part 1: Deploy the Server to Railway
-
-### Step 1.1: Push your code to GitHub
-
-If you haven't already:
-
-```bash
-cd /Users/drewauster/whats-the-move
-git init
-git add .
-git commit -m "Initial commit"
-```
-
-Create a new repo at [github.com/new](https://github.com/new) named `whats-the-move`, then:
-
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/whats-the-move.git
-git branch -M main
-git push -u origin main
-```
-
-### Step 1.2: Create a Railway account
-
-1. Go to [railway.app](https://railway.app)
-2. Click **Login** → **Login with GitHub**
-3. Authorize Railway
-
-### Step 1.3: Create a new project
-
-1. Click **New Project**
-2. Select **Deploy from GitHub repo**
-3. Choose `whats-the-move` (or your repo name)
-4. If prompted, click **Configure GitHub App** and allow Railway access to the repo
+**US-wide behavior:** Venue logic (categories, editorial Unsplash queries, Ticketmaster matching) is written for **any US city**—avoid hardcoding a single metro’s team names or landmarks in app code. If you need venue-specific Ticketmaster aliases, prefer env or a small deploy-side config rather than shipping city-only lists in the repo.
 
 ### Step 1.4: Configure the service to use the server folder
 
@@ -47,6 +11,24 @@ git push -u origin main
 5. Leave **Start Command** blank (Railway uses `npm start` from package.json)
 6. Railway will auto-redeploy
 
+#### Redeployed but `/` still shows only `openai` / `google` / `unsplash` (no `ok` or `photoPipeline`)?
+
+That response is **not** from the current `server/index.js` in this repo — Railway is still running an **older build** or the **wrong folder**.
+
+Check these in order:
+
+1. **Push your code to GitHub** (or whatever Railway watches). Edits only on your laptop do **nothing** until you `git add`, `git commit`, and `git push`. In Railway → **Deployments**, open the latest deploy and confirm the **commit SHA** matches your latest push.
+
+2. **Root Directory must be `server`** (Settings → Build / Source). If it’s empty or set to the repo root, Railway may run the **Expo app’s** `npm start` (`expo start`) instead of the API, or pick up an old/wrong `package.json`.
+
+3. **Correct service** — make sure the public URL is attached to the **Node API** service, not a database or a second placeholder service.
+
+4. After a successful deploy, **`GET /`** must look like:
+   ```json
+   { "ok": true, "service": "whats-the-move", "photoPipeline": "unsplash-editorial-v1", "hint": "..." }
+   ```
+   **`GET /api-status`** must include **`photoPipeline`** and **`unsplashEnv`** (not just five string fields).
+
 ### Step 1.5: Add environment variables
 
 1. In your Railway service, go to **Variables**
@@ -56,15 +38,28 @@ git push -u origin main
 | Variable | Where to get it |
 |----------|-----------------|
 | `OPENAI_API_KEY` | [platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys) |
-| `GOOGLE_PLACES_API_KEY` | [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials) |
+| `GOOGLE_PLACES_API_KEY` | [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials) — enable **Places API (New)** for Text Search + Place Details, and **Places API** (legacy) for Text Search + Details **metadata** fallback (ratings, summary). Google is **not** used for list/detail photos. |
+| `UNSPLASH_ACCESS_KEY` | [unsplash.com/oauth/applications](https://unsplash.com/oauth/applications) — **required for photos** in the app (`/place-photo` list heroes and `/place-details` carousel). Uses curated editorial-style searches by category/vibe (not random venue-name Google image search). You can also set `EXPO_PUBLIC_UNSPLASH_ACCESS_KEY` to the same value. |
 | `TICKETMASTER_API_KEY` | [developer.ticketmaster.com](https://developer.ticketmaster.com) (optional) |
 | `EXPO_PUBLIC_TICKETMASTER_API_KEY` | Same as above (optional) |
 | `EXPO_PUBLIC_INTERNATIONAL_SHOWTIMES_API_KEY` | [internationalshowtimes.com](https://www.internationalshowtimes.com) (optional) |
-| `UNSPLASH_ACCESS_KEY` | [unsplash.com/oauth/applications](https://unsplash.com/oauth/applications) (optional) |
 
-**Minimum required:** `OPENAI_API_KEY` and `GOOGLE_PLACES_API_KEY`
+**Minimum required:** `OPENAI_API_KEY`, `GOOGLE_PLACES_API_KEY`, and `UNSPLASH_ACCESS_KEY` (for imagery; without Unsplash, photo endpoints return empty URLs).
 
 4. Click **Deploy** if it doesn’t auto-redeploy
+
+#### Photos still look like old Google storefronts?
+
+`unsplash: configured` only means the **key** is set — it does **not** prove Railway is running the **latest server code**. After each deploy, verify:
+
+1. **`GET https://YOUR-RAILWAY-URL/`** must include `"ok": true`, `"service": "whats-the-move"`, and **`"photoPipeline": "unsplash-editorial-v1"`**.  
+   If you see only `{ "openai": "OK", "google": "OK", ... }` with **no** `ok` / `service` / `photoPipeline`, the deployment is **still an old build** — push this repo’s `server/` to Railway and redeploy.
+
+2. **`GET .../place-photo?q=museum&sourceName=Test&area=Los%20Angeles`** — `photoUrl` should point at **`images.unsplash.com`** (or similar Unsplash CDN), **not** `lh3.googleusercontent.com` or `maps.googleapis.com`.
+
+3. **Root** `EXPO_PUBLIC_API_URL` in the app must point at the **same** Railway URL you checked above, then restart Expo with cache clear: `npx expo start -c`.
+
+4. **Unsplash dashboard shows 0 requests** — the app uses the **Access Key** (`Authorization: Client-ID …`), **not** the Secret Key. After deploy, open **`GET /unsplash-ping`** on your server. You should see `"ok": true`, `"httpStatus": 200`, and **`"photoPipeline": "unsplash-editorial-v1"`**. If `httpStatus` is **401/403**, the key in Railway is wrong or the Secret was pasted by mistake. If `/unsplash-ping` **404s**, you’re still on old server code (redeploy from this repo with Root Directory `server`).
 
 ### Step 1.6: Get your server URL
 
@@ -74,11 +69,21 @@ git push -u origin main
 
 ### Step 1.7: Verify the server
 
-Open in your browser:
+Open in your browser (use your real Railway URL):
 
-- `https://YOUR-RAILWAY-URL/api-status`
+1. **`https://YOUR-RAILWAY-URL/health`** — should return `{"ok":true}` immediately (confirms the app is reachable).
+2. **`https://YOUR-RAILWAY-URL/`** — quick JSON saying the service is up (no slow checks).
+3. **`https://YOUR-RAILWAY-URL/api-status`** — full key checks (OpenAI/Google, etc.). If you see `"openai": "OK"` and `"google": "OK"`, keys are valid. For Unsplash, check **`unsplashEnv`**: if **`UNSPLASH_ACCESS_KEY_chars`** and **`EXPO_PUBLIC_UNSPLASH_ACCESS_KEY_chars`** are both **0**, the key is not in Railway’s environment (your laptop’s `server/.env` is **not** used in production — add the same variable in **Railway → Variables** and redeploy).
 
-You should see JSON with API status. If you see `"openai": "OK"` and `"google": "OK"`, the server is working.
+If the bare domain ever showed **“Application failed to respond”**, it was often because the old root URL waited on slow external API calls and timed out. Redeploy after pulling the latest server code so `/` stays fast.
+
+#### If deploy logs look fine but the browser still says “Application failed to respond”
+
+That usually means **the public URL is not attached to the service that is running Node**, or the edge timed out on a cold start.
+
+1. **Same service:** Open **Settings → Networking** on the **whats-the-move** service (the one whose **Deploy Logs** show `AI move server listening`). Your generated domain must appear **on that service**. If you have more than one service (e.g. database + web), the domain might be on the wrong one — **remove** the domain from the wrong service and **Generate Domain** on the API service, or use **Custom Domain** mapping in Railway’s UI.
+2. **HTTP Logs:** In Railway, open **HTTP Logs** for this service and load `/health` in the browser. If you see **no request**, traffic isn’t reaching this service (wrong domain/service). If you see **502/503**, check deploy logs for crashes right after startup.
+3. **Retry:** After a deploy or scale-from-zero, wait **30–60 seconds** and try `/health` again once or twice.
 
 ---
 
@@ -94,6 +99,8 @@ EXPO_PUBLIC_API_URL=https://YOUR-RAILWAY-URL
 ```
 
 Replace `YOUR-RAILWAY-URL` with the URL from Step 1.6 (no trailing slash).
+
+**Physical phone on the same Wi‑Fi (local server):** `localhost` only works on the simulator. Set `EXPO_PUBLIC_API_URL` to your Mac’s LAN URL, e.g. `http://192.168.1.x:3001` (same port as `node server/index.js`). If photos and `/place-details` work in `curl` on the Mac but not in the app on a device, this is almost always the cause.
 
 3. Save the file
 
