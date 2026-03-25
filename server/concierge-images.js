@@ -166,6 +166,18 @@ export function googlePlacePhotoMediaUrl(photoResourceName, apiKey, maxWidthPx =
   return `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidthPx}&key=${encodeURIComponent(apiKey)}`;
 }
 
+function isBadPlacePhotoMeta(p) {
+  const w = Number(p.widthPx || p.width || 0);
+  const h = Number(p.heightPx || p.height || 0);
+  if (w > 0 && w < MIN_PIXEL_WIDTH) return true;
+  if (h > 0 && w > 0 && h > w * 1.05) return true;
+  if (w > 0 && h > 0) {
+    const ar = w / h;
+    if (ar < 1.15 && ar > 0.85 && w < 1100) return true;
+  }
+  return false;
+}
+
 function pickPlacePhotoNames(photos) {
   if (!Array.isArray(photos) || photos.length === 0) return [];
   const sorted = [...photos].sort((a, b) => {
@@ -177,12 +189,11 @@ function pickPlacePhotoNames(photos) {
   for (const p of sorted) {
     const n = p.name || p.googleMapsUri;
     if (!n || typeof n !== "string") continue;
-    const w = Number(p.widthPx || p.width || 0);
-    if (w > 0 && w < MIN_PIXEL_WIDTH) continue;
+    if (isBadPlacePhotoMeta(p)) continue;
     names.push(n);
     if (names.length >= 2) break;
   }
-  if (names.length === 0 && sorted[0]?.name) names.push(sorted[0].name);
+  if (names.length === 0 && sorted[0]?.name && !isBadPlacePhotoMeta(sorted[0])) names.push(sorted[0].name);
   return names;
 }
 
@@ -278,7 +289,14 @@ export async function resolveConciergeSuggestionImages({
     if (!photoUrl && !ticketed) {
       const q = String(s.unsplashQuery || "").trim();
       const fallbacks = [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
-      if (unsplashKey) {
+      if (!photoUrl && place?.websiteUri) {
+        const og = await fetchOgImageUrl(place.websiteUri);
+        if (og) {
+          photoUrl = og;
+          photoSource = "website";
+        }
+      }
+      if (!photoUrl && unsplashKey) {
         try {
           const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
             maxImages: 1,
@@ -291,13 +309,6 @@ export async function resolveConciergeSuggestionImages({
           }
         } catch {
           /* keep null */
-        }
-      }
-      if (!photoUrl && place?.websiteUri) {
-        const og = await fetchOgImageUrl(place.websiteUri);
-        if (og) {
-          photoUrl = og;
-          photoSource = "website";
         }
       }
       if (!photoUrl && place && googleApiKey) {

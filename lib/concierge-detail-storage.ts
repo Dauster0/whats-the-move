@@ -8,6 +8,19 @@ export type ConciergeDetailPayload = {
   others: ConciergeSuggestion[];
 };
 
+/** Synchronous handoff so navigation never waits on AsyncStorage. */
+let pendingPayload: ConciergeDetailPayload | null = null;
+
+export function setPendingConciergeDetail(payload: ConciergeDetailPayload) {
+  pendingPayload = payload;
+}
+
+export function consumePendingConciergeDetail(): ConciergeDetailPayload | null {
+  const p = pendingPayload;
+  pendingPayload = null;
+  return p;
+}
+
 export async function setConciergeDetailPayload(payload: ConciergeDetailPayload) {
   await AsyncStorage.setItem(KEY, JSON.stringify(payload));
 }

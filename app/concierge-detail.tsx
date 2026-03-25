@@ -22,10 +22,12 @@ import { useThemeColors } from "../hooks/use-theme-colors";
 import { buildBookingActions } from "../lib/booking-links";
 import {
   clearConciergeDetailPayload,
+  consumePendingConciergeDetail,
   getConciergeDetailPayload,
   setConciergeDetailPayload,
   type ConciergeDetailPayload,
 } from "../lib/concierge-detail-storage";
+import { takeCachedConciergeQuick } from "../lib/concierge-quick-cache";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
 import { font, radius, spacing } from "../lib/theme";
 import { getReadableLocation } from "../lib/location";
@@ -115,7 +117,8 @@ export default function ConciergeDetailScreen() {
     setLoadingQuick(true);
     setNarrativeLoading(true);
     setErr("");
-    const p = await getConciergeDetailPayload();
+    const pending = consumePendingConciergeDetail();
+    const p = pending ?? (await getConciergeDetailPayload());
     setPayload(p);
     if (!p?.suggestion) {
       setErr("Nothing to show.");
@@ -141,15 +144,26 @@ export default function ConciergeDetailScreen() {
         suggestion: p.suggestion,
       };
 
-      const resQ = await fetch(`${SERVER_URL}/concierge-detail/quick`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const dataQ = (await resQ.json().catch(() => ({}))) as DetailApi & { error?: string };
-      if (!resQ.ok) {
-        setErr(typeof dataQ.error === "string" ? dataQ.error : "Couldn’t load details.");
-        setDetail(null);
+      const cached = takeCachedConciergeQuick(p.suggestion) as (DetailApi & { error?: string }) | null;
+      let dataQ = cached && !cached.error ? cached : null;
+
+      if (!dataQ) {
+        const resQ = await fetch(`${SERVER_URL}/concierge-detail/quick`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        dataQ = (await resQ.json().catch(() => ({}))) as DetailApi & { error?: string };
+        if (!resQ.ok) {
+          setErr(typeof dataQ.error === "string" ? dataQ.error : "Couldn’t load details.");
+          setDetail(null);
+          setLoadingQuick(false);
+          setNarrativeLoading(false);
+          return;
+        }
+      }
+      if (!dataQ) {
+        setErr("Couldn’t load details.");
         setLoadingQuick(false);
         setNarrativeLoading(false);
         return;
@@ -375,7 +389,11 @@ export default function ConciergeDetailScreen() {
           {!showFullSkeleton ? (
             <>
           <Text style={styles.title}>{title}</Text>
-          {detail?.venueName ? <Text style={styles.venue}>{detail.venueName}</Text> : null}
+          {detail?.venueName || suggestion?.theaterSubtitle ? (
+            <Text style={styles.venue}>
+              {detail?.venueName || suggestion?.theaterSubtitle || suggestion?.venueName}
+            </Text>
+          ) : null}
 
           <View style={styles.metaRow}>
             <Text style={styles.metaChip}>{detail?.category || suggestion?.category}</Text>
@@ -417,6 +435,29 @@ export default function ConciergeDetailScreen() {
               </Pressable>
             ) : null}
           </View>
+
+          {suggestion?.kind === "movie" && suggestion.showtimes && suggestion.showtimes.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>{"Tonight's showtimes"}</Text>
+              <View style={styles.showtimePillRow}>
+                {suggestion.showtimes.map((p, i) => (
+                  <Pressable
+                    key={`${p.label}-${i}`}
+                    style={[styles.showtimePill, { borderColor: colors.accent + "66" }]}
+                    onPress={() => {
+                      const u =
+                        (p.bookingUrl || "").trim() ||
+                        (suggestion.ticketUrl || "").trim() ||
+                        (suggestion.fandangoFallbackUrl || "").trim();
+                      if (u) Linking.openURL(u).catch(() => {});
+                    }}
+                  >
+                    <Text style={[styles.showtimePillText, { color: colors.accent }]}>{p.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <View style={styles.sectionTitleRow}>
             <Text style={[styles.sectionTitle, { marginTop: 0 }]}>The vibe</Text>
@@ -688,6 +729,23 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
+    },
+    showtimePillRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: spacing.sm,
+    },
+    showtimePill: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: radius.sm,
+      borderWidth: 1.5,
+      backgroundColor: colors.bgCard,
+    },
+    showtimePillText: {
+      fontSize: 13,
+      fontWeight: "800",
     },
     paragraph: {
       marginTop: spacing.sm,

@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import { fetchUnsplashEditorial } from "./editorial-photos.js";
 import { googlePlacePhotoMediaUrl, pickTicketmasterCardImage } from "./concierge-images.js";
 import { buildResaleSearchUrls } from "./resale-links.js";
+import { fetchTmdbMovieById } from "./movie-enrichment.js";
 
 const TM_KEY = process.env.TICKETMASTER_API_KEY || process.env.EXPO_PUBLIC_TICKETMASTER_API_KEY;
 const GOOGLE_KEY =
@@ -211,6 +212,8 @@ function openingSummary(detail) {
 }
 
 export function detectKind(suggestion) {
+  const k = String(suggestion.kind || "").toLowerCase();
+  if (k === "movie" || String(suggestion.tmdbId || "").trim()) return "movie";
   const t = String(suggestion.ticketEventId || "").trim();
   if (t || String(suggestion.ticketUrl || "").trim()) return "event";
   const cat = String(suggestion.category || "").toLowerCase();
@@ -327,7 +330,7 @@ function buildCostBlock({
 
 function buildPrimaryCta({ kind, cost, suggestion }) {
   const ticketUrl = String(cost.ticketUrl || suggestion.ticketUrl || "").trim();
-  if (kind === "event" && ticketUrl) {
+  if ((kind === "event" || kind === "movie") && ticketUrl) {
     return {
       label: cost.label ? `Buy tickets — ${cost.label}` : "Buy tickets",
       url: ticketUrl,
@@ -414,6 +417,16 @@ export async function runConciergeDetailQuick(body) {
     }
   }
 
+  const tmdbId = String(suggestion.tmdbId || "").trim();
+  let movieBackdrop = String(suggestion.movieBackdropUrl || "").trim();
+  if (!movieBackdrop && tmdbId) {
+    const m = await fetchTmdbMovieById(tmdbId);
+    if (m?.backdropUrl) movieBackdrop = m.backdropUrl;
+  }
+  if (movieBackdrop) {
+    heroUrls = [movieBackdrop, ...heroUrls.filter((u) => u !== movieBackdrop)].slice(0, 8);
+  }
+
   const placeMeta = buildPlaceMeta(placeRaw);
 
   let distanceMiles = null;
@@ -470,7 +483,7 @@ export async function runConciergeDetailQuick(body) {
     "";
   const isTicketed =
     kind === "event" || Boolean(String(suggestion.ticketUrl || "").trim() || tmDetail?.url);
-  const resale = isTicketed
+  const resale = kind !== "movie" && isTicketed
     ? buildResaleSearchUrls({
         eventName: tmDetail?.name || suggestion.title,
         venueName: tmDetail?.venueName || suggestion.venueName,

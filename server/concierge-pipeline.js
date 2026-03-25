@@ -4,7 +4,9 @@
  */
 
 import OpenAI from "openai";
-import { resolveConciergeSuggestionImages } from "./concierge-images.js";
+import { matchNearbyPlace, resolveConciergeSuggestionImages } from "./concierge-images.js";
+import { enrichConciergeMovieSuggestions } from "./movie-enrichment.js";
+import { SYSTEM_PROMPT } from "./concierge-prompt.js";
 
 const TM_KEY = process.env.TICKETMASTER_API_KEY || process.env.EXPO_PUBLIC_TICKETMASTER_API_KEY;
 const GOOGLE_KEY =
@@ -157,6 +159,7 @@ async function fetchPlacesNearbyDigest(lat, lng) {
         reviews: typeof p.userRatingCount === "number" ? p.userRatingCount : null,
         address: p.formattedAddress ?? "",
         openNow: openNow === true ? true : openNow === false ? false : null,
+        nextCloseTime: p.currentOpeningHours?.nextCloseTime ?? null,
         types: (p.types ?? []).slice(0, 6),
         id: p.id ?? p.name ?? "",
         websiteUri: p.websiteUri ?? "",
@@ -172,24 +175,120 @@ async function fetchPlacesNearbyDigest(lat, lng) {
   }
 }
 
-const SYSTEM_PROMPT = `You are a local concierge for the user's actual city. You know what's happening tonight and what fits a real person's energy and time budget.
+function buildSuggestionKey(s) {
+  const tid = String(s.ticketEventId || "").trim();
+  if (tid) return `e:${tid}`;
+  const gr = String(s.googlePlaceResourceName || "").trim();
+  if (gr) return `p:${gr}`;
+  const t = String(s.title || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  const mq = String(s.mapQuery || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return `t:${t}|${mq}`;
+}
 
-You receive real data: Ticketmaster events and Google Places venues near them (with ratings and often open/closed). You MUST ground recommendations in that data whenever possible—use real venue and event names from the payload. You may add ONE "wildcard" idea only if it is plausible for this exact date, location, and season (art walk nights, seasonal nature moments, etc.) and you state uncertainty honestly ("if it's running tonight…").
+function filterExcludedKeys(suggestions, excludeKeys) {
+  const ex = new Set((excludeKeys || []).map((x) => String(x)));
+  if (ex.size === 0) return suggestions;
+  return suggestions.filter((s) => !ex.has(buildSuggestionKey(s)));
+}
 
-Hard rules:
-- Never suggest a generic activity with no place name ("go for a walk", "get coffee") unless you name a specific spot from the data or a clearly named local staple.
-- Respect time: no hikes at 11pm, no bars at 8am, no kids' trampoline parks after 9pm unless the payload shows a special event.
-- Respect energy: low = cozy, close, easy, quiet; high = social, loud, active, farther OK.
-- Respect timeBudget: "30min" means quick and nearby; "allday" can be ambitious.
-- Do not repeat the same category twice in a row (vary eat / event / walk / chill / social).
-- Never use filler phrases like "why not try", "perfect for", "you might enjoy".
-- Sound like a well-connected friend texting: warm, specific, slightly informal, never cheesy.
-- At least one pick should feel surprising or lesser-known if the data allows.
+function filterSafetyMacArthur(suggestions, hour24) {
+  return suggestions.filter((s) => {
+    const blob = `${s.title} ${s.mapQuery}`.toLowerCase();
+    if (!blob.includes("macarthur park")) return true;
+    if (hour24 >= 20 || hour24 < 6) return false;
+    return true;
+  });
+}
 
-Return ONLY valid JSON (no markdown) with this exact shape:
-{"suggestions":[{"title":"string","description":"string","category":"walk|eat|event|experience|social|chill","timeRequired":"string","energyLevel":"low|medium|high","address":"string or empty","startTime":"string or empty","venueName":"for Ticketmaster events: venue name only; empty otherwise","mapQuery":"string for maps search","unsplashQuery":"vibe and moment ONLY — never the venue or brand name. Describe what it feels like to be there (light, food, crowd, nature). Examples: moody cocktail bar low light hands on glass; golden hour hiking trail dust path; jazz quartet silhouette intimate stage; grunion run beach night wet sand bioluminescence.","whyNow":"string or empty","ticketUrl":"string or empty","ticketEventId":"exact ticketmasterEvents[].id when the pick is from that list; otherwise empty","sourcePlaceName":"exact nearbyPlaces[].name when the pick is from that list; otherwise empty"}]}
+function filterClosedVenuePlaces(suggestions, nearbyPlaces) {
+  const out = [];
+  for (const s of suggestions) {
+    if (String(s.ticketEventId || "").trim()) {
+      out.push(s);
+      continue;
+    }
+    if (String(s.ticketUrl || "").trim()) {
+      out.push(s);
+      continue;
+    }
+    const cat = String(s.category || "").toLowerCase();
+    const isPlaceKind = /eat|walk|social|chill/.test(cat);
+    if (!isPlaceKind) {
+      out.push(s);
+      continue;
+    }
+    const place = matchNearbyPlace(s, nearbyPlaces);
+    if (place && place.openNow === false) continue;
+    out.push(s);
+  }
+  return out;
+}
 
-Use 4 or 5 suggestions only. For Ticketmaster picks: title = artist/show name only (not the venue). mapQuery should be specific (venue + neighborhood or city). ticketUrl and ticketEventId must match the same event in ticketmasterEvents.`;
+function applyVarietyCaps(suggestions) {
+  let eat = 0;
+  let walk = 0;
+  const eatSub = new Set();
+  const out = [];
+  for (const s of suggestions) {
+    const cat = String(s.category || "").toLowerCase();
+    const isEat = cat === "eat";
+    const isWalk = cat === "walk";
+    const ft = String(s.flavorTag || "")
+      .trim()
+      .toLowerCase();
+    if (isEat && eat >= 2) continue;
+    if (isWalk && walk >= 1) continue;
+    if (isEat && ft) {
+      if (eatSub.has(ft)) continue;
+      eatSub.add(ft);
+    }
+    if (isEat) eat += 1;
+    if (isWalk) walk += 1;
+    out.push(s);
+  }
+  const hasEventOrExperience = out.some((x) => {
+    const c = String(x.category || "").toLowerCase();
+    return c === "event" || c === "experience";
+  });
+  if (!hasEventOrExperience && suggestions.length >= 3) return suggestions;
+  return out.length >= 3 ? out : suggestions;
+}
+
+function attachPlaceResourceNames(suggestions, nearbyPlaces) {
+  return suggestions.map((s) => {
+    const place = matchNearbyPlace(s, nearbyPlaces);
+    if (place?.resourceName) {
+      return { ...s, googlePlaceResourceName: String(place.resourceName).trim() };
+    }
+    return s;
+  });
+}
+
+function attachPlaceMeta(suggestions, nearbyPlaces, nowIso) {
+  const now = new Date(nowIso).getTime();
+  return suggestions.map((s) => {
+    const place = matchNearbyPlace(s, nearbyPlaces);
+    if (!place) {
+      return { ...s, placeOpenNow: null, closesSoon: false };
+    }
+    let closesSoon = false;
+    if (place.nextCloseTime) {
+      const t = new Date(place.nextCloseTime).getTime();
+      if (!Number.isNaN(t) && t > now && (t - now) / 60000 <= 45) closesSoon = true;
+    }
+    return {
+      ...s,
+      placeOpenNow: place.openNow != null ? place.openNow : null,
+      closesSoon,
+    };
+  });
+}
 
 function wallPartsFromIso(iso, tz) {
   try {
@@ -228,6 +327,7 @@ function normalizeSuggestions(raw) {
       title: title.slice(0, 120),
       description: description.slice(0, 400),
       category: String(s.category || "experience").slice(0, 32),
+      flavorTag: String(s.flavorTag || "").slice(0, 32),
       timeRequired: String(s.timeRequired || "").slice(0, 32),
       energyLevel: String(s.energyLevel || "medium").slice(0, 16),
       address: String(s.address || "").slice(0, 200),
@@ -261,6 +361,9 @@ export async function runConciergeRecommendations(body) {
   const interests = Array.isArray(body.interests) ? body.interests.map((x) => String(x)).slice(0, 24) : [];
   const recentSuggestions = Array.isArray(body.recentSuggestions)
     ? body.recentSuggestions.map((x) => String(x)).slice(0, 20)
+    : [];
+  const excludeSuggestionKeys = Array.isArray(body.excludeSuggestionKeys)
+    ? body.excludeSuggestionKeys.map((x) => String(x)).slice(0, 200)
     : [];
   const userContextLine = String(body.userContextLine || "").slice(0, 800);
 
@@ -359,6 +462,19 @@ export async function runConciergeRecommendations(body) {
     seedBase,
     googleApiKey: GOOGLE_KEY && !String(GOOGLE_KEY).includes("your") ? GOOGLE_KEY : "",
   });
+
+  suggestions = await enrichConciergeMovieSuggestions(suggestions, {
+    lat,
+    lng,
+    timeZone,
+    nowIso,
+    areaLabel,
+    energy,
+    userContextLine,
+    nearbyPlaces,
+  });
+
+  suggestions = attachPlaceMeta(suggestions, nearbyPlaces, nowIso);
 
   return {
     suggestions,
