@@ -10,6 +10,11 @@ import {
   getEditorialAltRejectSubstrings,
 } from "./editorial-photos.js";
 import { runConciergeRecommendations } from "./concierge-pipeline.js";
+import {
+  runConciergeDetail,
+  runConciergeDetailQuick,
+  runConciergeDetailNarrative,
+} from "./concierge-detail-pipeline.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2438,6 +2443,48 @@ app.post("/concierge-recommendations", async (req, res) => {
       error: String(err?.message || err),
       suggestions: [],
       meta: null,
+    });
+  }
+});
+
+app.post("/concierge-detail", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const out = await runConciergeDetail(req.body || {});
+    res.json(out);
+  } catch (err) {
+    console.error("concierge-detail:", err?.message || err);
+    res.status(422).json({
+      error: String(err?.message || err),
+      detail: null,
+    });
+  }
+});
+
+app.post("/concierge-detail/quick", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const out = await runConciergeDetailQuick(req.body || {});
+    res.json(out);
+  } catch (err) {
+    console.error("concierge-detail/quick:", err?.message || err);
+    res.status(422).json({
+      error: String(err?.message || err),
+      detail: null,
+    });
+  }
+});
+
+app.post("/concierge-detail/narrative", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const out = await runConciergeDetailNarrative(req.body || {});
+    res.json(out);
+  } catch (err) {
+    console.error("concierge-detail/narrative:", err?.message || err);
+    res.status(422).json({
+      error: String(err?.message || err),
+      detail: null,
     });
   }
 });

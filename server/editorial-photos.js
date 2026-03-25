@@ -352,7 +352,7 @@ export async function fetchUnsplashEditorial(
         const base = p.urls?.raw || p.urls?.full || p.urls?.regular;
         if (!base) continue;
         const clean = base.split("?")[0];
-        urls.push(`${clean}?w=1800&q=88&fm=jpg&fit=max&auto=format`);
+        urls.push(`${clean}?w=2400&q=90&fm=jpg&fit=max&auto=format`);
         attributions.push({
           name: p.user?.name || "Photographer",
           profileUrl: p.user?.links?.html || "https://unsplash.com",

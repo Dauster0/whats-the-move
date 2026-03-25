@@ -102,7 +102,33 @@ function looksLikeBadOgUrl(href) {
   const low = href.toLowerCase();
   if (!/^https?:\/\//.test(low)) return true;
   if (/favicon|apple-touch|sprite\.png|logo\.svg|wixstatic.*\.svg/.test(low)) return true;
+  if (/\/logo[s/]|[/_-]logo[._-]|wordmark|brand[_-]mark|site[_-]icon|header[_-]icon|social[_-]share|og-default|placeholder|badge|avatar/.test(low))
+    return true;
+  if (/\/\d{2,3}x\d{2,3}[/_-]|_[0-9]{2,3}x[0-9]{2,3}[._-]/.test(low)) return true;
+  const wParam = low.match(/[\?&]w(?:idth)?=(\d+)/i);
+  if (wParam && Number(wParam[1]) > 0 && Number(wParam[1]) < 500) return true;
+  const hParam = low.match(/[\?&]h(?:eight)?=(\d+)/i);
+  if (hParam && Number(hParam[1]) > 0 && Number(hParam[1]) < 400) return true;
   return false;
+}
+
+async function ogImagePassesSizeProbe(imageUrl) {
+  try {
+    const r = await fetch(imageUrl, {
+      method: "HEAD",
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; WhatsTheMove/1.0)" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) return true;
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (ct && !ct.startsWith("image/")) return false;
+    const len = r.headers.get("content-length");
+    if (len != null && Number(len) > 0 && Number(len) < 14000) return false;
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 export async function fetchOgImageUrl(websiteUrl) {
@@ -127,13 +153,14 @@ export async function fetchOgImageUrl(websiteUrl) {
     if (img.startsWith("//")) img = `https:${img}`;
     const abs = new URL(img, raw).href;
     if (looksLikeBadOgUrl(abs)) return null;
+    if (!(await ogImagePassesSizeProbe(abs))) return null;
     return abs;
   } catch {
     return null;
   }
 }
 
-export function googlePlacePhotoMediaUrl(photoResourceName, apiKey, maxWidthPx = 1600) {
+export function googlePlacePhotoMediaUrl(photoResourceName, apiKey, maxWidthPx = 1920) {
   if (!photoResourceName || !apiKey) return null;
   const name = String(photoResourceName).replace(/^\/+/, "");
   return `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidthPx}&key=${encodeURIComponent(apiKey)}`;
@@ -229,42 +256,59 @@ export async function resolveConciergeSuggestionImages({
       }
     }
 
-    if (!photoUrl && place?.websiteUri) {
-      const og = await fetchOgImageUrl(place.websiteUri);
-      if (og) {
-        photoUrl = og;
-        photoSource = "website";
-      }
-    }
-
-    if (!photoUrl && unsplashKey) {
+    if (!photoUrl && ticketed && unsplashKey) {
       const q = String(s.unsplashQuery || "").trim();
-      const fallbacks = ticketed
-        ? [q || `${s.title} live show atmosphere`, "concert stage lights crowd night energy"]
-        : [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
+      const fallbacks = [q || `${s.title} live show atmosphere`, "concert stage lights crowd night energy"];
       try {
         const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
           maxImages: 1,
-          seed: `${seedBase}-${i}-${ticketed ? "t" : "p"}`,
+          seed: `${seedBase}-${i}-t`,
           minPhotoWidth: MIN_PIXEL_WIDTH,
         });
         if (urls[0]) {
           photoUrl = urls[0];
-          photoSource = photoSource || "unsplash";
+          photoSource = "unsplash";
+          imageLayout = "cover";
         }
       } catch {
         /* keep null */
       }
     }
 
-    if (!photoUrl && place && googleApiKey) {
-      const names = pickPlacePhotoNames(place.photos);
-      for (const pname of names) {
-        const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1600);
-        if (u) {
-          photoUrl = u;
-          photoSource = "google_places";
-          break;
+    if (!photoUrl && !ticketed) {
+      const q = String(s.unsplashQuery || "").trim();
+      const fallbacks = [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
+      if (unsplashKey) {
+        try {
+          const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+            maxImages: 1,
+            seed: `${seedBase}-${i}-p`,
+            minPhotoWidth: MIN_PIXEL_WIDTH,
+          });
+          if (urls[0]) {
+            photoUrl = urls[0];
+            photoSource = "unsplash";
+          }
+        } catch {
+          /* keep null */
+        }
+      }
+      if (!photoUrl && place?.websiteUri) {
+        const og = await fetchOgImageUrl(place.websiteUri);
+        if (og) {
+          photoUrl = og;
+          photoSource = "website";
+        }
+      }
+      if (!photoUrl && place && googleApiKey) {
+        const names = pickPlacePhotoNames(place.photos);
+        for (const pname of names) {
+          const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1920);
+          if (u) {
+            photoUrl = u;
+            photoSource = "google_places";
+            break;
+          }
         }
       }
     }
@@ -272,6 +316,9 @@ export async function resolveConciergeSuggestionImages({
     s.photoUrl = photoUrl;
     s.imageLayout = imageLayout;
     s.photoSource = photoSource;
+    if (place?.resourceName) {
+      s.googlePlaceResourceName = String(place.resourceName).trim();
+    }
     enriched.push(s);
   }
 

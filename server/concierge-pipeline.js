@@ -139,7 +139,7 @@ async function fetchPlacesNearbyDigest(lat, lng) {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_KEY,
         "X-Goog-FieldMask":
-          "places.displayName,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.formattedAddress,places.types,places.id,places.websiteUri,places.photos",
+          "places.name,places.displayName,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.formattedAddress,places.types,places.id,places.websiteUri,places.photos",
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(12000),
@@ -152,6 +152,7 @@ async function fetchPlacesNearbyDigest(lat, lng) {
         p.currentOpeningHours?.openNow ?? p.regularOpeningHours?.openNow ?? undefined;
       return {
         name: p.displayName?.text ?? "",
+        resourceName: typeof p.name === "string" ? p.name : "",
         rating: typeof p.rating === "number" ? p.rating : null,
         reviews: typeof p.userRatingCount === "number" ? p.userRatingCount : null,
         address: p.formattedAddress ?? "",

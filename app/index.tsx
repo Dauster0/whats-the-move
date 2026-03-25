@@ -24,7 +24,8 @@ import { getReadableLocation } from "../lib/location";
 import { getRecentConciergeTitles, pushRecentConciergeTitle } from "../lib/recent-concierge-storage";
 import { buildUserContextLine } from "../lib/user-context-line";
 import { useMoveStore } from "../store/move-context";
-import { ConciergeHeroCard } from "../components/concierge-hero-card";
+import { ConciergeHeroCard, getConciergeCardMinHeight } from "../components/concierge-hero-card";
+import { setConciergeDetailPayload } from "../lib/concierge-detail-storage";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W;
@@ -55,6 +56,7 @@ function mapApiConciergeSuggestion(x: Record<string, unknown>): ConciergeSuggest
     ticketUrl: String(x.ticketUrl ?? ""),
     ticketEventId: String(x.ticketEventId ?? ""),
     sourcePlaceName: String(x.sourcePlaceName ?? ""),
+    googlePlaceResourceName: String(x.googlePlaceResourceName ?? ""),
     photoUrl: x.photoUrl ? String(x.photoUrl) : null,
     imageLayout: x.imageLayout === "poster" ? "poster" : "cover",
     photoSource: x.photoSource != null ? String(x.photoSource) : null,
@@ -161,6 +163,18 @@ export default function HomeScreen() {
     }, [isLoaded, hasFinishedOnboarding, load])
   );
 
+  const openConciergeDetail = useCallback(
+    async (s: ConciergeSuggestion) => {
+      await setConciergeDetailPayload({
+        suggestion: s,
+        others: suggestions.filter((x) => x.title !== s.title),
+      });
+      void Haptics.selectionAsync();
+      router.push("/concierge-detail");
+    },
+    [suggestions]
+  );
+
   function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const x = e.nativeEvent.contentOffset.x;
     const i = Math.round(x / CARD_W);
@@ -171,6 +185,7 @@ export default function HomeScreen() {
     Alert.alert("Elsewhere", undefined, [
       { text: "Interests", onPress: () => router.push("/edit-interests") },
       { text: "Your details", onPress: () => router.push("/my-context" as Href) },
+      { text: "Saved moves", onPress: () => router.push("/saved-moves") },
       { text: "Shuffle deck", onPress: () => router.push("/suggestions") },
       { text: "Full finder", onPress: () => router.push("/whats-the-move-ai") },
       { text: "Cancel", style: "cancel" },
@@ -307,6 +322,8 @@ export default function HomeScreen() {
             onMomentumScrollEnd={onScrollEnd}
             scrollEventThrottle={16}
             decelerationRate="fast"
+            nestedScrollEnabled
+            style={{ minHeight: getConciergeCardMinHeight(CARD_W) }}
             contentContainerStyle={styles.cardsScrollContent}
           >
             {suggestions.map((s, idx) => (
@@ -315,6 +332,7 @@ export default function HomeScreen() {
                   suggestion={s}
                   width={CARD_W}
                   colors={colors}
+                  onCardPress={() => void openConciergeDetail(s)}
                   onOpenMaps={(sg) => {
                     void pushRecentConciergeTitle(sg.title);
                     openMapsQuery(sg.mapQuery || sg.title);

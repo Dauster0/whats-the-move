@@ -17,6 +17,17 @@ import { colorsLight, font, radius, spacing } from "../lib/theme";
 
 type ThemeColors = typeof colorsLight;
 
+/** Photo strip height (fixed). Text panel grows below — never clip CTAs with a short flex slot. */
+const IMAGE_ZONE_RATIO = 0.46;
+
+/** Use on horizontal `ScrollView` so the row is tall enough for the full card (image + text + CTAs). */
+export function getConciergeCardMinHeight(width: number) {
+  const pad = spacing.md;
+  const innerW = width - pad * 2;
+  const imageZoneH = Math.max(168, Math.round(innerW * IMAGE_ZONE_RATIO));
+  return imageZoneH + 400;
+}
+
 function categoryFallbackBackground(category: string) {
   const c = String(category || "").toLowerCase();
   if (/eat|food|restaurant|coffee|cafe|bakery|bar|drink/.test(c)) return "#3d2918";
@@ -65,16 +76,26 @@ type Props = {
   colors: ThemeColors;
   onOpenMaps: (s: ConciergeSuggestion) => void;
   onOpenTickets: (s: ConciergeSuggestion) => void;
+  /** Opens full detail sheet (card tap, not the map/ticket buttons). */
+  onCardPress?: () => void;
 };
 
-export function ConciergeHeroCard({ suggestion: s, width, colors, onOpenMaps, onOpenTickets }: Props) {
+export function ConciergeHeroCard({
+  suggestion: s,
+  width,
+  colors,
+  onOpenMaps,
+  onOpenTickets,
+  onCardPress,
+}: Props) {
   const pad = spacing.md;
   const innerW = width - pad * 2;
-  const mediaHeight = Math.round(innerW * 0.82);
+  const imageZoneH = Math.max(168, Math.round(innerW * IMAGE_ZONE_RATIO));
   const fallbackBg = categoryFallbackBackground(s.category);
   const poster = s.imageLayout === "poster";
   const ticketed = Boolean((s.ticketUrl || "").trim());
   const venue = (s.venueName || "").trim();
+  const why = (s.whyNow || "").trim();
 
   const [imgLoaded, setImgLoaded] = useState(!s.photoUrl);
   const [imgError, setImgError] = useState(false);
@@ -98,16 +119,36 @@ export function ConciergeHeroCard({ suggestion: s, width, colors, onOpenMaps, on
           },
         ]}
       >
-        <View style={[styles.media, { height: mediaHeight, backgroundColor: fallbackBg }]}>
-          {showShimmer ? <ShimmerOverlay style={StyleSheet.absoluteFill} /> : null}
+        <View style={styles.column}>
+          <Pressable
+            disabled={!onCardPress}
+            onPress={onCardPress}
+            style={({ pressed }) => [pressed && onCardPress ? { opacity: 0.98 } : null]}
+          >
+            <View style={[styles.imageZone, { height: imageZoneH, backgroundColor: fallbackBg }]}>
+            {showShimmer ? <ShimmerOverlay style={StyleSheet.absoluteFill} /> : null}
 
-          {showRemote ? (
-            poster ? (
-              <View style={styles.posterStage}>
+            {showRemote ? (
+              poster ? (
+                <View style={styles.posterStage}>
+                  <Image
+                    source={{ uri: s.photoUrl! }}
+                    style={styles.posterImage}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                    recyclingKey={s.photoUrl ?? undefined}
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => {
+                      setImgError(true);
+                      setImgLoaded(true);
+                    }}
+                  />
+                </View>
+              ) : (
                 <Image
                   source={{ uri: s.photoUrl! }}
-                  style={styles.posterImage}
-                  contentFit="contain"
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
                   cachePolicy="memory-disk"
                   recyclingKey={s.photoUrl ?? undefined}
                   onLoad={() => setImgLoaded(true)}
@@ -116,44 +157,30 @@ export function ConciergeHeroCard({ suggestion: s, width, colors, onOpenMaps, on
                     setImgLoaded(true);
                   }}
                 />
-              </View>
+              )
             ) : (
-              <Image
-                source={{ uri: s.photoUrl! }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={s.photoUrl ?? undefined}
-                onLoad={() => setImgLoaded(true)}
-                onError={() => {
-                  setImgError(true);
-                  setImgLoaded(true);
-                }}
-              />
-            )
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackBg }]} />
-          )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackBg }]} />
+            )}
 
-          <LinearGradient
-            pointerEvents="none"
-            colors={["transparent", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.94)"]}
-            locations={[0.28, 0.62, 1]}
-            style={styles.scrim}
-          />
-
-          {s.whyNow ? (
-            <View style={[styles.whyBadge, { borderLeftColor: colors.accent }]}>
-              <Text style={styles.whyBadgeLabel}>Why now</Text>
-              <Text style={styles.whyBadgeText} numberOfLines={2}>
-                {s.whyNow}
-              </Text>
+            <LinearGradient
+              pointerEvents="none"
+              colors={["transparent", "rgba(0,0,0,0.55)"]}
+              style={styles.imageBottomFade}
+            />
             </View>
-          ) : null}
 
-          <View style={styles.copyBlock}>
+            <View style={styles.textBody}>
+            {why ? (
+              <View style={[styles.whyBlock, { borderLeftColor: colors.accent }]}>
+                <Text style={styles.whyLabel}>Why now</Text>
+                <Text style={styles.whyBody} numberOfLines={3}>
+                  {why}
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.category}>{s.category}</Text>
-            <Text style={styles.title} numberOfLines={ticketed && venue ? 3 : 2}>
+            <Text style={styles.title} numberOfLines={3}>
               {s.title}
             </Text>
             {ticketed && venue ? (
@@ -161,15 +188,19 @@ export function ConciergeHeroCard({ suggestion: s, width, colors, onOpenMaps, on
                 {venue}
               </Text>
             ) : null}
-            <Text style={styles.description} numberOfLines={2}>
+            <Text style={styles.description} numberOfLines={4}>
               {s.description}
             </Text>
+
             <View style={styles.tagRow}>
               {s.timeRequired ? <Text style={styles.tag}>{s.timeRequired}</Text> : null}
               <Text style={styles.tag}>{s.energyLevel}</Text>
               {s.startTime ? <Text style={styles.tag}>{s.startTime}</Text> : null}
             </View>
+            </View>
+          </Pressable>
 
+          <View style={styles.textPanelFooter}>
             {ticketed ? (
               <View style={styles.ctaRow}>
                 <Pressable
@@ -183,7 +214,7 @@ export function ConciergeHeroCard({ suggestion: s, width, colors, onOpenMaps, on
                   <Ionicons name="open-outline" size={18} color={colors.textInverse} />
                 </Pressable>
                 <Pressable
-                  style={[styles.secondaryBtn, { borderColor: "rgba(255,255,255,0.45)" }]}
+                  style={[styles.secondaryBtn, { borderColor: "rgba(255,255,255,0.35)" }]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onOpenMaps(s);
@@ -218,8 +249,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
   },
-  media: {
+  column: {
+    flexDirection: "column",
     width: "100%",
+    flexShrink: 0,
+  },
+  imageZone: {
+    width: "100%",
+    overflow: "hidden",
     position: "relative",
   },
   posterStage: {
@@ -230,72 +267,77 @@ const styles = StyleSheet.create({
   },
   posterImage: {
     width: "92%",
-    height: "86%",
+    height: "88%",
   },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  whyBadge: {
-    position: "absolute",
-    top: spacing.sm,
-    left: spacing.sm,
-    right: spacing.sm,
-    maxWidth: "90%",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(0,0,0,0.72)",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: radius.sm,
-    borderLeftWidth: 3,
-  },
-  whyBadgeLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  whyBadgeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#fff",
-    lineHeight: 18,
-  },
-  copyBlock: {
+  imageBottomFade: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    height: 36,
+  },
+  textBody: {
+    backgroundColor: "#161412",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    borderTopWidth: 2,
+    borderTopColor: "rgba(255,255,255,0.14)",
+  },
+  textPanelFooter: {
+    backgroundColor: "#161412",
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+    paddingTop: 4,
+  },
+  whyBlock: {
+    marginBottom: spacing.sm,
+    paddingLeft: 10,
+    paddingVertical: 8,
+    paddingRight: 8,
+    borderLeftWidth: 3,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: radius.sm,
+  },
+  whyLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  whyBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.92)",
   },
   category: {
     fontSize: 11,
     fontWeight: "700",
-    color: "rgba(255,255,255,0.62)",
+    color: "rgba(255,255,255,0.55)",
     textTransform: "lowercase",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
-    fontSize: font.sizeXl,
-    lineHeight: 34,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "800",
     color: "#fff",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   venue: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: font.sizeSm,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.75)",
   },
   description: {
     marginTop: 10,
     fontSize: font.sizeMd,
     lineHeight: 22,
     fontWeight: "500",
-    color: "rgba(255,255,255,0.9)",
+    color: "rgba(255,255,255,0.88)",
   },
   tagRow: {
     flexDirection: "row",
@@ -307,8 +349,8 @@ const styles = StyleSheet.create({
   tag: {
     fontSize: 12,
     fontWeight: "700",
-    color: "rgba(255,255,255,0.85)",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    color: "rgba(255,255,255,0.88)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: radius.sm,
@@ -346,7 +388,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.md,
     borderWidth: 1.5,
-    backgroundColor: "rgba(0,0,0,0.25)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   secondaryBtnText: {
     fontSize: 15,

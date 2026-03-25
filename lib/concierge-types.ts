@@ -22,6 +22,8 @@ export type ConciergeSuggestion = {
   photoUrl: string | null;
   imageLayout?: ConciergeImageLayout;
   photoSource?: string | null;
+  /** Google Places resource name when matched server-side */
+  googlePlaceResourceName?: string;
 };
 
 export type ConciergeResponse = {

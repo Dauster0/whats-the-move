@@ -18,7 +18,15 @@ function StackWithTheme() {
           animation: "slide_from_right",
           contentStyle: { backgroundColor: colors.bg },
         }}
-      />
+      >
+        <Stack.Screen
+          name="concierge-detail"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
+      </Stack>
     </>
   );
 }
