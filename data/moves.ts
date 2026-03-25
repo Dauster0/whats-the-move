@@ -1,10 +1,9 @@
 export const microActions = [
-  "Drink water",
-  "Stretch for 60 seconds",
-  "Take 5 deep breaths",
-  "Clean your desk for 2 minutes",
-  "Stand up and shake out your arms",
-  "Write one sentence in a journal",
+  "Step outside for 10 minutes. No destination.",
+  "Drive somewhere with a good view and just sit there",
+  "Find a late-night diner open near you and get coffee",
+  "Call someone you've been meaning to call",
+  "Walk around the block once — no headphones",
 ];
 
 export const shortActions = [

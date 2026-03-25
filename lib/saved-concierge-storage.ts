@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ConciergeSuggestion } from "./concierge-types";
+import { recordSwipeBookmark } from "./swipe-signals-storage";
 
 const KEY = "@concierge/saved-moves-v1";
 const MAX = 40;
@@ -35,6 +36,7 @@ export async function saveConciergeMove(suggestion: ConciergeSuggestion): Promis
     ...existing.filter((x) => x.id !== id),
   ].slice(0, MAX);
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  void recordSwipeBookmark(suggestion.category || "experience");
   return true;
 }
 

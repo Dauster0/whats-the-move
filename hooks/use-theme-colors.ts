@@ -1,7 +1,6 @@
-import { useColorScheme } from "react-native";
 import { getColors } from "../lib/theme";
 
+/** Product identity: one dark, image-forward palette everywhere (not system light mode). */
 export function useThemeColors() {
-  const colorScheme = useColorScheme();
-  return getColors(colorScheme === "dark");
+  return getColors(true);
 }

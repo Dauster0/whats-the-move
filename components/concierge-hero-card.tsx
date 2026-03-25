@@ -225,6 +225,12 @@ export function ConciergeHeroCard({
         {s.description}
       </Text>
 
+      {s.distanceText || s.cost ? (
+        <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={2}>
+          {[s.distanceText, s.cost].filter(Boolean).join(" · ")}
+        </Text>
+      ) : null}
+
       {isMovie &&
       (s.tmdbRating != null ||
         s.runtimeMinutes != null ||

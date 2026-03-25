@@ -27,6 +27,11 @@ export type ConciergeSuggestion = {
   sourcePlaceName: string;
   /** Food sub-type for variety (e.g. korean_bbq) — server */
   flavorTag?: string;
+  /** food | event | experience | wildcard | budget — deck slot from server */
+  deckRole?: string;
+  cost?: string;
+  isTimeSensitive?: boolean;
+  distanceText?: string;
   /** From Google Places when matched */
   placeOpenNow?: boolean | null;
   /** Closing within ~45 minutes — server */

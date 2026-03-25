@@ -4,6 +4,7 @@
  */
 
 import { fetchUnsplashEditorial } from "./editorial-photos.js";
+import { isImageTopRegionPredominantlyWhite } from "./image-brightness.js";
 
 const MIN_PIXEL_WIDTH = 800;
 
@@ -23,6 +24,14 @@ function normalizeTicketUrl(u) {
       .trim()
       .toLowerCase();
   }
+}
+
+function koreanBbqUnsplashQuery(s) {
+  const ft = String(s.flavorTag || "").toLowerCase();
+  if (ft.includes("korean") || ft === "korean_bbq") {
+    return "korean bbq galbi short ribs grill smoke close up";
+  }
+  return "";
 }
 
 function normalizeRatio(r) {
@@ -291,14 +300,16 @@ export async function resolveConciergeSuggestionImages({
       const fallbacks = [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
       if (!photoUrl && place?.websiteUri) {
         const og = await fetchOgImageUrl(place.websiteUri);
-        if (og) {
+        if (og && !(await isImageTopRegionPredominantlyWhite(og))) {
           photoUrl = og;
           photoSource = "website";
         }
       }
       if (!photoUrl && unsplashKey) {
+        const kq = koreanBbqUnsplashQuery(s);
+        const fb = [kq, ...fallbacks].filter(Boolean);
         try {
-          const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+          const { urls } = await fetchUnsplashEditorial(unsplashKey, fb, {
             maxImages: 1,
             seed: `${seedBase}-${i}-p`,
             minPhotoWidth: MIN_PIXEL_WIDTH,
@@ -315,11 +326,11 @@ export async function resolveConciergeSuggestionImages({
         const names = pickPlacePhotoNames(place.photos);
         for (const pname of names) {
           const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1920);
-          if (u) {
-            photoUrl = u;
-            photoSource = "google_places";
-            break;
-          }
+          if (!u) continue;
+          if (await isImageTopRegionPredominantlyWhite(u)) continue;
+          photoUrl = u;
+          photoSource = "google_places";
+          break;
         }
       }
     }

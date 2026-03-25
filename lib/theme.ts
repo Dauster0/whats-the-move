@@ -53,11 +53,11 @@ export const colorsDark = {
   warning: "#D9A15B",
 };
 
-/** @deprecated Use useThemeColors() for theme-aware colors */
-export const colors = colorsLight;
+/** Legacy import — app uses dark identity everywhere; keep in sync with useThemeColors(). */
+export const colors = colorsDark;
 
-export function getColors(isDark: boolean) {
-  return isDark ? colorsDark : colorsLight;
+export function getColors(_isDark: boolean) {
+  return colorsDark;
 }
 
 /** Mostly square corners — reads more editorial / human than pill cards */

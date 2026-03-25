@@ -1,3 +1,4 @@
+import type { HungerPreference } from "../lib/food-preference";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   ReactNode,
@@ -31,6 +32,8 @@ export type UserPreferences = {
   ageRange: "under18" | "18-24" | "25-34" | "35-44" | "45+" | "prefer_not";
   /** Separate from socialMode: introverts get fewer “ping a friend” nudges */
   socialBattery: "introvert" | "ambivert" | "extrovert";
+  /** Food tilt for concierge deck (same idea as old “Hungry?” full finder). */
+  hungerPreference: HungerPreference;
 };
 
 type MoveContextType = {
@@ -71,6 +74,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   schoolOrWork: "",
   ageRange: "prefer_not",
   socialBattery: "ambivert",
+  hungerPreference: "any",
 };
 
 function getStartOfDay(date: Date) {
@@ -167,6 +171,12 @@ export function MoveProvider({ children }: { children: ReactNode }) {
               parsed?.socialBattery === "extrovert"
                 ? parsed.socialBattery
                 : "ambivert",
+            hungerPreference:
+              parsed?.hungerPreference === "hungry" ||
+              parsed?.hungerPreference === "not_hungry" ||
+              parsed?.hungerPreference === "any"
+                ? parsed.hungerPreference
+                : "any",
           });
         }
 

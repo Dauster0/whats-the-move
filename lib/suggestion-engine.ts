@@ -207,57 +207,57 @@ function buildInstantMoves(context: SuggestionContext): EngineSuggestion[] {
 
   const moves: EngineSuggestion[] = [
     {
-      id: "micro-water",
+      id: "micro-step-out",
       type: "generic",
-      title: "Drink a full glass of water",
-      subtitle: "A fast reset",
-      reason: "Almost zero effort, but enough to break the loop.",
+      title: "Step outside for 10 minutes. No destination.",
+      subtitle: "Low effort, real air",
+      reason: "A small real-world break that still feels like a move.",
       category: "micro",
-      durationMinutes: 1,
-      tags: ["health", "calm"],
+      durationMinutes: 10,
+      tags: ["outdoor", "calm"],
     },
     {
-      id: "micro-breathing",
+      id: "micro-view-drive",
       type: "generic",
-      title: "Take 5 slow deep breaths",
-      subtitle: "A fast nervous system reset",
-      reason: "The easiest possible interruption to passive scrolling.",
+      title: "Drive somewhere with a good view and just sit there",
+      subtitle: "A tiny outing",
+      reason: "Changes your state without a big plan.",
       category: "micro",
-      durationMinutes: 2,
-      tags: ["calm"],
+      durationMinutes: 20,
+      tags: ["outdoor", "calm"],
     },
     {
-      id: "micro-desk-reset",
+      id: "micro-late-diner",
       type: "generic",
-      title: "Clean your desk for 2 minutes",
-      subtitle: "A tiny physical reset",
-      reason: "Physical movement without needing to leave.",
+      title: "Find a late-night diner open near you and get coffee",
+      subtitle: "Real place, low stakes",
+      reason: "Something small that still pulls you into the world.",
       category: "micro",
-      durationMinutes: 2,
-      tags: ["focus", "indoor"],
+      durationMinutes: 25,
+      tags: ["food", "night"],
     },
     {
-      id: "micro-phone-down",
+      id: "micro-call-pending",
       type: "generic",
-      title: "Put your phone face-down for 5 minutes",
-      subtitle: "A tiny reset window",
-      reason: "Small enough to actually follow through on.",
+      title: "Call someone you've been meaning to call",
+      subtitle: "A real human connection",
+      reason: "Low effort and more grounding than another five minutes online.",
       category: "micro",
-      durationMinutes: 5,
-      tags: ["calm", "indoor"],
+      durationMinutes: 10,
+      tags: ["social"],
     },
   ];
 
   if (preferences.interests.includes("journaling")) {
     moves.push({
-      id: "micro-journal-line",
+      id: "micro-bookmark-place",
       type: "generic",
-      title: "Write one sentence about how you feel right now",
-      subtitle: "A quick mental reset",
-      reason: "Low effort and more grounding than another five minutes online.",
+      title: "Save a place you want to go this weekend",
+      subtitle: "A tiny real-world plan",
+      reason: "Turns a vague idea into something you can actually do.",
       category: "micro",
-      durationMinutes: 2,
-      tags: ["calm", "creative", "indoor"],
+      durationMinutes: 3,
+      tags: ["creative", "outdoor"],
     });
   }
 
@@ -289,14 +289,14 @@ function buildInstantMoves(context: SuggestionContext): EngineSuggestion[] {
 
   if (timeOfDay === "night") {
     moves.push({
-      id: "micro-night-reset",
+      id: "micro-night-walk",
       type: "generic",
-      title: "Do a 3-minute wind-down with no screen",
-      subtitle: "A calmer night move",
-      reason: "Better fit for nighttime than another stimulation hit.",
+      title: "Walk around the block once — no headphones",
+      subtitle: "A quiet night move",
+      reason: "Real world, low pressure, still feels like a move.",
       category: "micro",
-      durationMinutes: 3,
-      tags: ["calm", "night"],
+      durationMinutes: 10,
+      tags: ["calm", "night", "outdoor"],
     });
   }
 

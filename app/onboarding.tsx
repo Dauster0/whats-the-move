@@ -38,6 +38,7 @@ export default function OnboardingScreen() {
     schoolOrWork: "",
     ageRange: "prefer_not",
     socialBattery: "ambivert",
+    hungerPreference: "any",
   });
 
   function toggleInterest(value: string) {

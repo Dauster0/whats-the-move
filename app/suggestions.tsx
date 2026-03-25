@@ -1,5 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemeColors } from "../hooks/use-theme-colors";
+import { getColors, radius } from "../lib/theme";
 import {
   Animated,
   Modal,
@@ -161,6 +164,8 @@ if (eligible.length === 0) {
 }
 
 export default function SuggestionsScreen() {
+  const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { preferences } = useMoveStore();
   const { minMinutes, maxMinutes } = useLocalSearchParams<{
     minMinutes?: string;
@@ -427,6 +432,8 @@ export default function SuggestionsScreen() {
   const vibeLabel = move ? getVibeLabel(move) : "";
   const headerTitle = getTimeLabel(weather);
 
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const quickAction = useMemo(() => {
     if (!move) return null;
 
@@ -449,7 +456,7 @@ export default function SuggestionsScreen() {
 
   if (!move) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.loadingTitle}>Looking for something better...</Text>
         <Text style={styles.loadingSub}>{loadMessage}</Text>
       </View>
@@ -457,7 +464,7 @@ export default function SuggestionsScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top + 48 }]}>
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backArrow}>←</Text>
@@ -687,11 +694,11 @@ export default function SuggestionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof getColors>) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#F6F3EE",
-    paddingTop: 64,
+    backgroundColor: colors.bg,
     paddingHorizontal: 20,
   },
 
@@ -700,13 +707,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
-    backgroundColor: "#F6F3EE",
+    backgroundColor: colors.bg,
   },
 
   loadingTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#171311",
+    color: colors.text,
     marginBottom: 8,
     textAlign: "center",
     letterSpacing: -0.2,
@@ -714,7 +721,7 @@ const styles = StyleSheet.create({
 
   loadingSub: {
     fontSize: 16,
-    color: "#6D6257",
+    color: colors.textMuted,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -728,17 +735,17 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 42,
     height: 42,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 3,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E6DED2",
+    borderColor: colors.border,
   },
 
   backArrow: {
     fontSize: 20,
-    color: "#171311",
+    color: colors.text,
     fontWeight: "600",
   },
 
@@ -750,36 +757,36 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#171311",
+    color: colors.text,
   },
 
   headerSub: {
     fontSize: 13,
-    color: "#8B8072",
+    color: colors.textMuted,
     marginTop: 2,
   },
 
   counterPill: {
     minWidth: 54,
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 3,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.sm,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: "#E6DED2",
+    borderColor: colors.border,
   },
 
   counterNumber: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#171311",
+    color: colors.text,
     lineHeight: 18,
   },
 
   counterLabel: {
     fontSize: 10,
-    color: "#9A8F82",
+    color: colors.textMuted,
     fontWeight: "600",
     letterSpacing: 0,
     marginTop: 1,
@@ -791,7 +798,7 @@ const styles = StyleSheet.create({
 
   contextText: {
     fontSize: 13,
-    color: "#8B8072",
+    color: colors.textMuted,
     fontWeight: "600",
   },
 
@@ -802,16 +809,16 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 4,
+    backgroundColor: colors.bgCard,
+    borderRadius: 18,
     padding: 24,
     borderWidth: 1,
-    borderColor: "#E8E0D5",
+    borderColor: "rgba(255,255,255,0.1)",
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   topRow: {
@@ -822,26 +829,26 @@ const styles = StyleSheet.create({
   },
 
   vibePill: {
-    backgroundColor: "#F4EDE2",
-    borderRadius: 4,
+    backgroundColor: colors.bgCardSoft,
+    borderRadius: radius.sm,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#E4DACD",
+    borderColor: colors.border,
   },
 
   vibeText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6E6255",
+    color: colors.textMuted,
     letterSpacing: 0,
   },
 
   infoBtn: {
     width: 38,
     height: 38,
-    borderRadius: 3,
-    backgroundColor: "#F4EDE2",
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgCardSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -849,13 +856,13 @@ const styles = StyleSheet.create({
   infoBtnText: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#171311",
+    color: colors.text,
   },
 
   moveTitle: {
     fontSize: 30,
     fontWeight: "700",
-    color: "#171311",
+    color: colors.text,
     lineHeight: 36,
     letterSpacing: -0.3,
     marginBottom: 10,
@@ -863,7 +870,7 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 17,
-    color: "#6D6257",
+    color: colors.textMuted,
     lineHeight: 24,
     marginBottom: 14,
   },
@@ -877,18 +884,18 @@ const styles = StyleSheet.create({
 
   metaText: {
     fontSize: 14,
-    color: "#8E8377",
+    color: colors.textMuted,
     fontWeight: "700",
   },
 
   metaDot: {
     marginHorizontal: 8,
-    color: "#B0A598",
+    color: colors.textMuted,
   },
 
   reasonText: {
     fontSize: 16,
-    color: "#5F554B",
+    color: colors.textSub,
     lineHeight: 25,
     marginBottom: 18,
   },
@@ -902,17 +909,17 @@ const styles = StyleSheet.create({
   reactionButton: {
     width: 46,
     height: 46,
-    borderRadius: 3,
-    backgroundColor: "#F7F1E8",
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgCardSoft,
     borderWidth: 1,
-    borderColor: "#E4DACD",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
   reactionButtonActive: {
-    backgroundColor: "#171311",
-    borderColor: "#171311",
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
 
   reactionIcon: {
@@ -920,8 +927,8 @@ const styles = StyleSheet.create({
   },
 
   startButton: {
-    backgroundColor: "#171311",
-    borderRadius: 4,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
     paddingVertical: 20,
     alignItems: "center",
     justifyContent: "center",
@@ -929,24 +936,24 @@ const styles = StyleSheet.create({
   },
 
   startButtonText: {
-    color: "#FFFFFF",
+    color: colors.textInverse,
     fontSize: 17,
     fontWeight: "700",
   },
 
   mapButton: {
-    backgroundColor: "#F7F1E8",
-    borderRadius: 4,
+    backgroundColor: colors.bgCardSoft,
+    borderRadius: radius.md,
     paddingVertical: 18,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#E4DACD",
+    borderColor: colors.border,
   },
 
   mapButtonText: {
-    color: "#171311",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -960,7 +967,7 @@ const styles = StyleSheet.create({
   },
 
   hideTextButtonText: {
-    color: "#A19588",
+    color: colors.textMuted,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -972,23 +979,25 @@ const styles = StyleSheet.create({
   },
 
   nextButtonText: {
-    color: "#7A6F63",
+    color: colors.textMuted,
     fontSize: 17,
     fontWeight: "700",
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(23,19,17,0.28)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "flex-end",
   },
 
   modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
+    backgroundColor: colors.bgCard,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     padding: 20,
     paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   modalHandle: {
@@ -996,21 +1005,21 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#D8CFC3",
+    backgroundColor: colors.borderStrong,
     marginBottom: 16,
   },
 
   modalTitle: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#171311",
+    color: colors.text,
     marginBottom: 6,
     letterSpacing: -0.2,
   },
 
   modalSubtitle: {
     fontSize: 16,
-    color: "#6D6257",
+    color: colors.textMuted,
     marginBottom: 16,
     lineHeight: 22,
   },
@@ -1021,7 +1030,7 @@ const styles = StyleSheet.create({
 
   infoLabel: {
     fontSize: 11,
-    color: "#9A8F82",
+    color: colors.textMuted,
     fontWeight: "600",
     letterSpacing: 0,
     marginBottom: 4,
@@ -1029,73 +1038,74 @@ const styles = StyleSheet.create({
 
   infoValue: {
     fontSize: 16,
-    color: "#171311",
+    color: colors.text,
     fontWeight: "600",
   },
 
   infoValueAddress: {
     fontSize: 14,
-    color: "#171311",
+    color: colors.text,
     fontWeight: "600",
     lineHeight: 20,
   },
 
   infoNote: {
     fontSize: 14,
-    color: "#6D6257",
+    color: colors.textMuted,
     lineHeight: 20,
     marginBottom: 12,
   },
 
   whyBox: {
-    backgroundColor: "#F7F1E8",
-    borderRadius: 4,
+    backgroundColor: colors.bgCardSoft,
+    borderRadius: radius.md,
     padding: 14,
     marginTop: 6,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E4DACD",
+    borderColor: colors.border,
   },
 
   whyTitle: {
     fontSize: 14,
-    color: "#171311",
+    color: colors.text,
     fontWeight: "700",
     marginBottom: 6,
   },
 
   whyText: {
     fontSize: 14,
-    color: "#5F554B",
+    color: colors.textSub,
     lineHeight: 20,
   },
 
   modalButton: {
-    backgroundColor: "#171311",
-    borderRadius: 4,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 10,
   },
 
   modalButtonText: {
-    color: "#FFFFFF",
+    color: colors.textInverse,
     fontSize: 16,
     fontWeight: "700",
   },
 
   modalSecondaryButton: {
-    backgroundColor: "#F7F1E8",
-    borderRadius: 4,
+    backgroundColor: colors.bgCardSoft,
+    borderRadius: radius.md,
     paddingVertical: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E4DACD",
+    borderColor: colors.border,
   },
 
   modalSecondaryButtonText: {
-    color: "#171311",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
-});
+  });
+}

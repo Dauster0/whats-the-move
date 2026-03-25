@@ -37,6 +37,11 @@ import {
   registerDeckKeys,
 } from "../lib/shown-concierge-ids";
 import {
+  getSwipeSignalsForApi,
+  recordSwipeCommit,
+  recordSwipeSkip,
+} from "../lib/swipe-signals-storage";
+import {
   getSavedConciergeMoves,
   isConciergeMoveSaved,
   toggleSavedConciergeMove,
@@ -107,6 +112,10 @@ function mapApiConciergeSuggestion(x: Record<string, unknown>): ConciergeSuggest
     placeOpenNow:
       x.placeOpenNow === true ? true : x.placeOpenNow === false ? false : null,
     closesSoon: Boolean(x.closesSoon),
+    deckRole: x.deckRole != null ? String(x.deckRole) : undefined,
+    cost: x.cost != null ? String(x.cost) : undefined,
+    isTimeSensitive: x.isTimeSensitive === true,
+    distanceText: x.distanceText != null ? String(x.distanceText) : undefined,
   };
 }
 
@@ -127,7 +136,7 @@ export default function HomeScreen() {
       SCREEN_H - insets.top - insets.bottom - headerFiltersHint - deckButtonRow - gap;
     return Math.max(320, Math.min(660, available));
   }, [insets.top, insets.bottom]);
-  const { hasFinishedOnboarding, isLoaded, preferences } = useMoveStore();
+  const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
 
   const [energy, setEnergy] = useState<ConciergeEnergy>("medium");
   const [timeBudget, setTimeBudget] = useState<ConciergeTimeBudget>("mid");
@@ -138,7 +147,6 @@ export default function HomeScreen() {
   const [areaLabel, setAreaLabel] = useState("");
   const [homeTab, setHomeTab] = useState<"forYou" | "saved">("forYou");
   const [leftDismissStreak, setLeftDismissStreak] = useState(0);
-  const [regenerating, setRegenerating] = useState(false);
   const [bookmarkSaved, setBookmarkSaved] = useState(false);
   const [savedRows, setSavedRows] = useState<SavedConciergeMove[]>([]);
   const [findingMoreDeck, setFindingMoreDeck] = useState(false);
@@ -165,6 +173,7 @@ export default function HomeScreen() {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const prefs = preferencesRef.current;
     const excludeSuggestionKeys = await getExcludeSuggestionKeys();
+    const swipeSignals = await getSwipeSignalsForApi();
 
     const res = await fetch(`${SERVER_URL}/concierge-recommendations`, {
       method: "POST",
@@ -181,6 +190,9 @@ export default function HomeScreen() {
         recentSuggestions,
         excludeSuggestionKeys,
         userContextLine: buildUserContextLine(prefs),
+        hungerPreference: prefs.hungerPreference ?? "any",
+        ageRange: prefs.ageRange ?? "prefer_not",
+        swipeSignals: swipeSignals ?? undefined,
       }),
     });
 
@@ -290,6 +302,7 @@ export default function HomeScreen() {
     setSuggestions((prev) => {
       const s = prev[0];
       if (!s) return prev;
+      void recordSwipeCommit(s.category || "experience");
       persistSwipeForHistory(s);
       const payload = { suggestion: s, others: prev.slice(1) };
       setPendingConciergeDetail(payload);
@@ -307,6 +320,7 @@ export default function HomeScreen() {
     setSuggestions((prev) => {
       const s = prev[0];
       if (!s) return prev;
+      void recordSwipeSkip(s.category || "experience");
       void pushRecentConciergeTitle(s.title);
       persistSwipeForHistory(s);
       const next = prev.slice(1);
@@ -316,14 +330,7 @@ export default function HomeScreen() {
     setLeftDismissStreak((st) => {
       const n = st + 1;
       if (n >= 3) {
-        void (async () => {
-          setRegenerating(true);
-          try {
-            await load("full");
-          } finally {
-            setRegenerating(false);
-          }
-        })();
+        void load("full");
         return 0;
       }
       return n;
@@ -352,7 +359,6 @@ export default function HomeScreen() {
       { text: "Your details", onPress: () => router.push("/my-context" as Href) },
       { text: "Saved moves", onPress: () => router.push("/saved-moves") },
       { text: "Shuffle deck", onPress: () => router.push("/suggestions") },
-      { text: "Full finder", onPress: () => router.push("/whats-the-move-ai") },
       { text: "Cancel", style: "cancel" },
     ]);
   }
@@ -477,6 +483,31 @@ export default function HomeScreen() {
             );
           })}
         </View>
+
+        <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Hungry?</Text>
+        <View style={styles.segmentRow}>
+          {(
+            [
+              { key: "any" as const, label: "Either" },
+              { key: "hungry" as const, label: "Hungry" },
+              { key: "not_hungry" as const, label: "Not hungry" },
+            ] as const
+          ).map(({ key, label }) => {
+            const active = (preferences.hungerPreference ?? "any") === key;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.segment, active && styles.segmentActive]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setPreferences({ ...preferences, hungerPreference: key });
+                }}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {loading && suggestions.length === 0 ? (
@@ -501,10 +532,7 @@ export default function HomeScreen() {
       ) : suggestions.length === 0 ? (
         <View style={styles.loadingBlock}>
           {findingMoreDeck ? (
-            <>
-              <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={[styles.loadingBlurb, { marginTop: spacing.sm }]}>Finding more moves…</Text>
-            </>
+            <Text style={[styles.loadingSub, { textAlign: "center" }]}>Getting more…</Text>
           ) : (
             <>
               <Text style={styles.errorText}>You’re caught up.</Text>
@@ -609,12 +637,6 @@ export default function HomeScreen() {
         </View>
       )}
     </ScrollView>
-    {regenerating ? (
-      <View style={[styles.regenOverlay, { backgroundColor: colors.bg + "EE" }]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={[styles.regenText, { color: colors.text }]}>Finding fresh picks…</Text>
-      </View>
-    ) : null}
     </View>
   );
 }
@@ -746,17 +768,6 @@ function createStyles(
     savedRowMeta: {
       fontSize: 12,
       marginTop: 2,
-    },
-    regenOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      justifyContent: "center",
-      alignItems: "center",
-      gap: spacing.sm,
-      zIndex: 50,
-    },
-    regenText: {
-      fontSize: 16,
-      fontWeight: "700",
     },
     controlBlock: {
       paddingHorizontal: spacing.md,
