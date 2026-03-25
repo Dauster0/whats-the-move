@@ -167,6 +167,8 @@ export default function HomeScreen() {
   const prefetchingNextDeckRef = useRef(false);
   const suggestionsLenRef = useRef(0);
   suggestionsLenRef.current = suggestions.length;
+  const suggestionsRef = useRef(suggestions);
+  suggestionsRef.current = suggestions;
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -324,20 +326,29 @@ export default function HomeScreen() {
 
   const commitSwipeRight = useCallback(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSuggestions((prev) => {
-      const s = prev[0];
-      if (!s) return prev;
-      void recordSwipeCommit(s.category || "experience");
-      persistSwipeForHistory(s);
-      const payload = { suggestion: s, others: prev.slice(1) };
-      setPendingConciergeDetail(payload);
-      void setConciergeDetailPayload(payload);
-      router.push("/concierge-detail");
-      const next = prev.slice(1);
-      if (next.length === 0) return applyNextDeckOrEmpty(prev);
+    const prev = suggestionsRef.current;
+    const s = prev[0];
+    if (!s) return;
+
+    const payload = { suggestion: s, others: prev.slice(1) };
+    setPendingConciergeDetail(payload);
+    void setConciergeDetailPayload(payload);
+    void recordSwipeCommit(s.category || "experience");
+    persistSwipeForHistory(s);
+
+    setSuggestions((latest) => {
+      const top = latest[0];
+      if (!top || top !== s) return latest;
+      const next = latest.slice(1);
+      if (next.length === 0) return applyNextDeckOrEmpty(latest);
       return next;
     });
+
     setLeftDismissStreak(0);
+
+    setTimeout(() => {
+      router.push("/concierge-detail");
+    }, 0);
   }, [applyNextDeckOrEmpty]);
 
   const commitSwipeLeft = useCallback(() => {

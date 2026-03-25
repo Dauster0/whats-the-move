@@ -424,7 +424,7 @@ export default function ConciergeDetailScreen() {
               ]}
             >
               {detail?.cost?.label ||
-                (detail?.cost?.free ? "Free" : suggestion?.ticketUrl ? "See tickets" : "Varies")}
+                (detail?.cost?.free ? "Free" : suggestion?.ticketUrl ? "Check prices" : "Varies")}
             </Text>
             {detail?.cost?.ticketUrl && !detail.cost.free ? (
               <Pressable

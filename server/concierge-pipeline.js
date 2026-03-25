@@ -45,14 +45,25 @@ async function fetchWeatherSummary(lat, lng) {
 
 function formatTmPriceRanges(priceRanges) {
   if (!Array.isArray(priceRanges) || priceRanges.length === 0) return "";
-  const p = priceRanges[0];
-  const cur = p.currency || "USD";
+  let bestMin = null;
+  let currency = "USD";
+  for (const p of priceRanges) {
+    const min = p.min != null ? Number(p.min) : null;
+    if (min == null || Number.isNaN(min)) continue;
+    if (bestMin == null || min < bestMin) {
+      bestMin = min;
+      currency = p.currency || "USD";
+    }
+  }
+  if (bestMin != null) {
+    const sym = currency === "USD" ? "$" : `${currency} `;
+    return `From ${sym}${Math.round(bestMin)}`;
+  }
+  const p0 = priceRanges[0];
+  const max = p0?.max != null ? Number(p0.max) : null;
+  const cur = p0?.currency || "USD";
   const sym = cur === "USD" ? "$" : `${cur} `;
-  const min = p.min != null ? Number(p.min) : null;
-  const max = p.max != null ? Number(p.max) : null;
-  if (min != null && max != null && min !== max) return `${sym}${Math.round(min)}–${Math.round(max)}`;
-  if (min != null) return `From ${sym}${Math.round(min)}`;
-  if (max != null) return `Up to ${sym}${Math.round(max)}`;
+  if (max != null && !Number.isNaN(max)) return `Up to ${sym}${Math.round(max)}`;
   return "";
 }
 

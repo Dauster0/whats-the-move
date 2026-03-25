@@ -52,17 +52,146 @@ function formatDriveEstimate(miles) {
   return `~${mins} min drive`;
 }
 
+/** Lowest listed price across Ticketmaster priceRanges → "From $X". */
 function formatPriceRangeFromTm(prices) {
   if (!Array.isArray(prices) || prices.length === 0) return null;
-  const p = prices[0];
-  const cur = p.currency || "USD";
+  let bestMin = null;
+  let currency = "USD";
+  for (const p of prices) {
+    const min = p.min != null ? Number(p.min) : null;
+    if (min == null || Number.isNaN(min)) continue;
+    if (bestMin == null || min < bestMin) {
+      bestMin = min;
+      currency = p.currency || "USD";
+    }
+  }
+  if (bestMin != null) {
+    if (bestMin <= 0) return "Free";
+    const sym = currency === "USD" ? "$" : `${currency} `;
+    return `From ${sym}${Math.round(bestMin)}`;
+  }
+  const p0 = prices[0];
+  const max = p0?.max != null ? Number(p0.max) : null;
+  const cur = p0?.currency || "USD";
   const sym = cur === "USD" ? "$" : `${cur} `;
-  const min = p.min != null ? Number(p.min) : null;
-  const max = p.max != null ? Number(p.max) : null;
-  if (min != null && max != null && min !== max) return `${sym}${Math.round(min)}–${Math.round(max)}`;
-  if (min != null) return `From ${sym}${Math.round(min)}`;
-  if (max != null) return `Up to ${sym}${Math.round(max)}`;
+  if (max != null && !Number.isNaN(max)) return `Up to ${sym}${Math.round(max)}`;
   return null;
+}
+
+function ymdInTimeZone(isoOrMs, tz) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(isoOrMs));
+  } catch {
+    return "";
+  }
+}
+
+function dayDiffCalendarYmd(nowYmd, eventYmd) {
+  const [ya, ma, da] = String(nowYmd).split("-").map(Number);
+  const [yb, mb, db] = String(eventYmd).split("-").map(Number);
+  if (!ya || !yb) return NaN;
+  const ua = Date.UTC(ya, ma - 1, da);
+  const ub = Date.UTC(yb, mb - 1, db);
+  return Math.round((ub - ua) / 86400000);
+}
+
+function hourInTimeZone(ms, tz) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      hour12: false,
+    }).formatToParts(new Date(ms));
+    return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  } catch {
+    return 12;
+  }
+}
+
+function formatClock12InTz(ms, tz) {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(ms));
+  } catch {
+    return "";
+  }
+}
+
+function formatShortWeekdayMonthDayAtClock(eventMs, tz) {
+  try {
+    const wd = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(
+      new Date(eventMs)
+    );
+    const md = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+      day: "numeric",
+    }).format(new Date(eventMs));
+    const clock = formatClock12InTz(eventMs, tz);
+    return `${wd}, ${md} at ${clock}`;
+  } catch {
+    return formatClock12InTz(eventMs, tz);
+  }
+}
+
+/**
+ * Plain-language event time for going-out context (not calendar-app style).
+ * Handles "tonight" for after-midnight shows that are still the same night out.
+ */
+function formatHumanGoingOutTime(nowMs, eventStartMs, timeZone) {
+  if (eventStartMs == null || Number.isNaN(eventStartMs) || !timeZone) return "";
+  const nowYmd = ymdInTimeZone(nowMs, timeZone);
+  const eventYmd = ymdInTimeZone(eventStartMs, timeZone);
+  if (!nowYmd || !eventYmd) return "";
+  const diff = dayDiffCalendarYmd(nowYmd, eventYmd);
+  const clock = formatClock12InTz(eventStartMs, timeZone);
+  if (!clock) return "";
+  const eventH = hourInTimeZone(eventStartMs, timeZone);
+
+  if (diff < 0) {
+    return formatShortWeekdayMonthDayAtClock(eventStartMs, timeZone);
+  }
+  if (diff === 0) {
+    if (eventH >= 17 || eventH < 4) return `Tonight at ${clock}`;
+    return `Today at ${clock}`;
+  }
+  if (diff === 1) {
+    if (eventH >= 0 && eventH < 4) return `Tonight at ${clock}`;
+    return `Tomorrow at ${clock}`;
+  }
+  if (diff >= 2 && diff <= 7) {
+    const dayName = new Intl.DateTimeFormat("en-US", {
+      timeZone: timeZone,
+      weekday: "long",
+    }).format(new Date(eventStartMs));
+    return `${dayName} at ${clock}`;
+  }
+  return formatShortWeekdayMonthDayAtClock(eventStartMs, timeZone);
+}
+
+function tmDatesStartMs(dates) {
+  const start = dates?.start;
+  if (!start) return null;
+  const dt = start.dateTime;
+  if (dt) {
+    const x = new Date(dt).getTime();
+    if (!Number.isNaN(x)) return x;
+  }
+  const ld = start.localDate;
+  const lt = start.localTime;
+  if (!ld) return null;
+  const timePart = lt && String(lt).length >= 4 ? String(lt) : "12:00:00";
+  const normalized = timePart.length === 5 ? `${timePart}:00` : timePart;
+  const x = new Date(`${ld}T${normalized}`).getTime();
+  return Number.isNaN(x) ? null : x;
 }
 
 function priceLevelToLabel(level) {
@@ -305,16 +434,21 @@ function buildCostBlock({
   narrative,
 }) {
   const ticketUrl = tmDetail?.url || String(suggestion.ticketUrl || "").trim();
-  if (kind === "event" && tmDetail?.priceLabel) {
+  const eventPriceFromTm =
+    kind === "event"
+      ? tmDetail?.priceLabel || formatPriceRangeFromTm(tmDetail?.priceRanges)
+      : null;
+  if (kind === "event" && eventPriceFromTm) {
+    const free = eventPriceFromTm === "Free";
     return {
-      label: tmDetail.priceLabel,
-      free: false,
+      label: eventPriceFromTm,
+      free,
       ticketUrl,
       fromTicketmaster: true,
     };
   }
   if (kind === "event" && ticketUrl) {
-    return { label: "See Ticketmaster", free: false, ticketUrl, fromTicketmaster: true };
+    return { label: "Check prices", free: false, ticketUrl, fromTicketmaster: true };
   }
   if (priceFromPlace?.free) {
     return { label: priceFromPlace.label, free: true, ticketUrl: "" };
@@ -331,8 +465,18 @@ function buildCostBlock({
 function buildPrimaryCta({ kind, cost, suggestion }) {
   const ticketUrl = String(cost.ticketUrl || suggestion.ticketUrl || "").trim();
   if ((kind === "event" || kind === "movie") && ticketUrl) {
+    if (cost.free) {
+      return { label: "Free — get tickets", url: ticketUrl, action: "tickets" };
+    }
+    const priceBit =
+      cost.label &&
+      cost.label !== "Check prices" &&
+      cost.label !== "Varies" &&
+      String(cost.label).trim()
+        ? cost.label
+        : "";
     return {
-      label: cost.label ? `Buy tickets — ${cost.label}` : "Buy tickets",
+      label: priceBit ? `Buy tickets — ${priceBit}` : "Buy tickets",
       url: ticketUrl,
       action: "tickets",
     };
@@ -352,6 +496,8 @@ export async function runConciergeDetailQuick(body) {
   if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
     throw new Error("lat and lng required");
   }
+  const timeZone = typeof body.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
+  const nowMs = body.nowIso ? new Date(String(body.nowIso)).getTime() : Date.now();
   const suggestion = body.suggestion && typeof body.suggestion === "object" ? body.suggestion : {};
   const mapQuery = String(suggestion.mapQuery || suggestion.title || "").trim();
   const kind = detectKind(suggestion);
@@ -460,10 +606,19 @@ export async function runConciergeDetailQuick(body) {
     narrative: placeholderNarrative,
   });
 
+  let timeLine = String(suggestion.startTime || "").trim();
+  if (kind === "event" && tmDetail?.dates) {
+    const evMs = tmDatesStartMs(tmDetail.dates);
+    if (evMs != null && !Number.isNaN(evMs)) {
+      const human = formatHumanGoingOutTime(nowMs, evMs, timeZone);
+      if (human) timeLine = human;
+    }
+  }
+
   const logistics = {
     address: placeMeta?.formattedAddress || tmDetail?.venueAddress || suggestion.address || "",
     mapQuery,
-    timeLine: suggestion.startTime || "",
+    timeLine,
     duration: suggestion.timeRequired || "",
     distanceText:
       distanceMiles != null ? `${distanceMiles.toFixed(distanceMiles < 10 ? 1 : 0)} mi away` : "",
