@@ -263,6 +263,31 @@ export async function resolveConciergeSuggestionImages({
     let imageLayout = "cover";
     let photoSource = null;
 
+    const isGptKnowledge = String(s.sourceType || "").toLowerCase() === "gpt_knowledge";
+    if (isGptKnowledge && unsplashKey) {
+      const q = String(s.unsplashQuery || "").trim();
+      const fallbacks = [q || `${s.title} los angeles neighborhood atmosphere`, "city afternoon street life warm light"];
+      try {
+        const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+          maxImages: 1,
+          seed: `${seedBase}-${i}-gk`,
+          minPhotoWidth: MIN_PIXEL_WIDTH,
+        });
+        if (urls[0]) {
+          photoUrl = urls[0];
+          photoSource = "unsplash";
+          imageLayout = "cover";
+        }
+      } catch {
+        /* keep null */
+      }
+      s.photoUrl = photoUrl;
+      s.imageLayout = imageLayout;
+      s.photoSource = photoSource;
+      enriched.push(s);
+      continue;
+    }
+
     const tmRecord = resolveTicketmasterRecord(s, lookup);
     const ticketed = isTicketedEventSuggestion(s);
     const place = !ticketed ? matchNearbyPlace(s, nearbyPlaces) : null;

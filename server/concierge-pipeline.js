@@ -6,6 +6,7 @@
 import OpenAI from "openai";
 import { matchNearbyPlace, resolveConciergeSuggestionImages } from "./concierge-images.js";
 import { enrichConciergeMovieSuggestions } from "./movie-enrichment.js";
+import { fetchPlacesWideNet } from "./places-wide-net.js";
 import { SYSTEM_PROMPT } from "./concierge-prompt.js";
 import { filterAndSortByScore, haversineMiles } from "./concierge-scoring.js";
 
@@ -68,14 +69,73 @@ function ymdInTimeZone(iso, tz) {
   }
 }
 
-/** Only events occurring on the user's local calendar day (no multi-day venue teases). */
-function filterTicketmasterToLocalToday(records, nowIso, timeZone) {
+function dayDiffYmd(a, b) {
+  const [ya, ma, da] = String(a)
+    .split("-")
+    .map((x) => Number(x));
+  const [yb, mb, db] = String(b)
+    .split("-")
+    .map((x) => Number(x));
+  if (!ya || !yb) return NaN;
+  const ua = Date.UTC(ya, ma - 1, da);
+  const ub = Date.UTC(yb, mb - 1, db);
+  return Math.round((ub - ua) / 86400000);
+}
+
+function calendarYmdInTz(ms, tz) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(ms));
+  } catch {
+    return "";
+  }
+}
+
+/** Weekday name for a calendar YYYY-MM-DD in the user's IANA timezone. */
+function weekdayLongForYmdInTz(ymd, tz) {
+  const [y, mo, d] = String(ymd)
+    .split("-")
+    .map((x) => parseInt(x, 10));
+  if (!y || !mo || !d) return "";
+  const base = Date.UTC(y, mo - 1, d, 12, 0, 0);
+  for (let delta = -14; delta <= 14; delta++) {
+    const ms = base + delta * 3600000;
+    if (calendarYmdInTz(ms, tz) === ymd) {
+      return new Intl.DateTimeFormat("en-US", { timeZone: tz || "UTC", weekday: "long" }).format(
+        new Date(ms)
+      );
+    }
+  }
+  return "";
+}
+
+function computeEventWhenLabel(e, nowIso, timeZone) {
   const today = ymdInTimeZone(nowIso, timeZone);
+  const eventDay =
+    String(e.localDate || "").trim() ||
+    (e.startIso ? ymdInTimeZone(e.startIso, timeZone) : "");
+  if (!eventDay || !/^\d{4}-\d{2}-\d{2}$/.test(eventDay)) return "";
+  const diff = dayDiffYmd(today, eventDay);
+  if (diff === 0) return "Tonight";
+  if (diff === 1) return "Tomorrow";
+  if (diff > 1 && diff <= 6) {
+    const w = weekdayLongForYmdInTz(eventDay, timeZone);
+    return w ? `This ${w}` : "";
+  }
+  if (diff > 6) return eventDay;
+  return "";
+}
+
+/** Events from now through the next `days` calendar days (inclusive window). */
+function filterTicketmasterUpcomingWindow(records, nowMs, maxDaysAhead = 5) {
+  const end = nowMs + maxDaysAhead * 86400000;
   return (records || []).filter((e) => {
-    const ld = String(e.localDate || "").trim();
-    if (ld && /^\d{4}-\d{2}-\d{2}$/.test(ld)) return ld === today;
-    if (e.startIso) return ymdInTimeZone(e.startIso, timeZone) === today;
-    return false;
+    const start = tmRecordStartMs(e);
+    return start != null && start >= nowMs - 15 * 60 * 1000 && start <= end;
   });
 }
 
@@ -106,129 +166,128 @@ function getEventStartMs(event) {
   return Number.isNaN(x) ? null : x;
 }
 
-async function fetchTicketmasterNearby(lat, lng) {
-  if (!TM_KEY || TM_KEY.includes("your_")) return [];
-  try {
-    const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json");
-    url.searchParams.set("apikey", TM_KEY);
-    url.searchParams.set("latlong", `${lat},${lng}`);
-    url.searchParams.set("radius", "25");
-    url.searchParams.set("unit", "miles");
-    url.searchParams.set("size", "40");
-    url.searchParams.set("sort", "date,asc");
-    const r = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
-    if (!r.ok) return [];
-    const data = await r.json();
-    const raw = data?._embedded?.events ?? [];
-    const now = Date.now();
-    const week = now + 7 * 24 * 60 * 60 * 1000;
-    const out = [];
-    for (const e of raw) {
-      const start = getEventStartMs(e);
-      if (start == null || start < now - 10 * 60 * 1000 || start > week) continue;
-      const v = e?._embedded?.venues?.[0];
-      const name = String(e?.name ?? "").trim();
-      if (!name || /cancel(?:l)?ed|postponed/i.test(name)) continue;
-      out.push({
-        id: String(e?.id ?? ""),
-        name,
-        venue: v?.name ?? "",
-        startIso: e?.dates?.start?.dateTime || null,
-        localDate: e?.dates?.start?.localDate ?? "",
-        localTime: e?.dates?.start?.localTime ?? "",
-        url: e?.url ?? "",
-        segment: e?.classifications?.[0]?.segment?.name ?? "",
-        genre: e?.classifications?.[0]?.genre?.name ?? "",
-        priceLabel: formatTmPriceRanges(e?.priceRanges),
-        images: Array.isArray(e?.images) ? e.images : [],
-        attractions: (e?._embedded?.attractions ?? []).map((a) => ({
-          name: a?.name ?? "",
-          images: Array.isArray(a?.images) ? a.images : [],
-        })),
-      });
-      if (out.length >= 28) break;
-    }
-    return out;
-  } catch {
-    return [];
+/** Start time for flattened TM rows from fetchTicketmasterNearby (or raw API event). */
+function tmRecordStartMs(rec) {
+  if (rec?.dates?.start) return getEventStartMs(rec);
+  if (rec?.startIso) {
+    const x = new Date(rec.startIso).getTime();
+    if (!Number.isNaN(x)) return x;
   }
+  const ld = rec?.localDate;
+  const lt = rec?.localTime;
+  if (!ld) return null;
+  const timePart = lt && String(lt).length >= 4 ? String(lt) : "12:00:00";
+  const normalized = timePart.length === 5 ? `${timePart}:00` : timePart;
+  const x = new Date(`${ld}T${normalized}`).getTime();
+  return Number.isNaN(x) ? null : x;
 }
 
-async function fetchPlacesNearbyDigest(lat, lng) {
-  if (
-    !GOOGLE_KEY ||
-    GOOGLE_KEY === "your_key_here" ||
-    GOOGLE_KEY === "your_google_key_here"
-  ) {
-    return [];
-  }
-  /** Omit performing_arts_theater — concert venues must come only from Ticketmaster with a real event id. */
-  const includedTypes = [
-    "restaurant",
-    "cafe",
-    "coffee_shop",
-    "bar",
-    "night_club",
-    "movie_theater",
-    "park",
-    "bakery",
-    "museum",
-    "bowling_alley",
-    "amusement_center",
-    "art_gallery",
-    "tourist_attraction",
-  ];
-  const body = {
-    includedTypes,
-    maxResultCount: 20,
-    rankPreference: "POPULARITY",
-    locationRestriction: {
-      circle: {
-        center: { latitude: lat, longitude: lng },
-        radius: 6500,
-      },
-    },
+/** Official Discovery segment ids (verified via classifications API). */
+const TM_SEGMENT = {
+  music: "KZFzniwnSyZfZ7v7nJ",
+  sports: "KZFzniwnSyZfZ7v7nE",
+  artsTheatre: "KZFzniwnSyZfZ7v7na",
+  miscellaneous: "KZFzniwnSyZfZ7v7n1",
+};
+
+/**
+ * Five parallel Discovery calls — Music, Sports, Arts, Comedy (arts + keyword), Family (misc segment).
+ * TM has no "Family" segment; Miscellaneous catches fairs, exhibits, and other family-friendly listings.
+ */
+const TM_PARALLEL_QUERIES = [
+  { segmentId: TM_SEGMENT.music },
+  { segmentId: TM_SEGMENT.sports },
+  { segmentId: TM_SEGMENT.artsTheatre },
+  { segmentId: TM_SEGMENT.artsTheatre, keyword: "comedy" },
+  { segmentId: TM_SEGMENT.miscellaneous },
+];
+
+function isTmDiscoveryEventCancelledOrBad(e) {
+  const name = String(e?.name ?? "");
+  if (/cancel(?:l)?ed|postponed/i.test(name)) return true;
+  const code = String(e?.dates?.status?.code ?? "").toLowerCase();
+  if (code === "cancelled" || code === "canceled") return true;
+  return false;
+}
+
+function mapTmDiscoveryEventToRecord(e) {
+  const v = e?._embedded?.venues?.[0];
+  const name = String(e?.name ?? "").trim();
+  if (!name || isTmDiscoveryEventCancelledOrBad(e)) return null;
+  const id = String(e?.id ?? "").trim();
+  if (!id) return null;
+  return {
+    id,
+    name,
+    venue: v?.name ?? "",
+    startIso: e?.dates?.start?.dateTime || null,
+    localDate: e?.dates?.start?.localDate ?? "",
+    localTime: e?.dates?.start?.localTime ?? "",
+    url: e?.url ?? "",
+    segment: e?.classifications?.[0]?.segment?.name ?? "",
+    genre: e?.classifications?.[0]?.genre?.name ?? "",
+    priceLabel: formatTmPriceRanges(e?.priceRanges),
+    images: Array.isArray(e?.images) ? e.images : [],
+    attractions: (e?._embedded?.attractions ?? []).map((a) => ({
+      name: a?.name ?? "",
+      images: Array.isArray(a?.images) ? a.images : [],
+    })),
   };
+}
+
+async function fetchTicketmasterDiscoverySegment(lat, lng, startIso, endIso, { segmentId, keyword, size }) {
+  const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json");
+  url.searchParams.set("apikey", TM_KEY);
+  url.searchParams.set("latlong", `${lat},${lng}`);
+  url.searchParams.set("radius", "25");
+  url.searchParams.set("unit", "miles");
+  url.searchParams.set("size", String(size));
+  url.searchParams.set("sort", "date,asc");
+  url.searchParams.set("startDateTime", startIso);
+  url.searchParams.set("endDateTime", endIso);
+  if (segmentId) url.searchParams.set("segmentId", segmentId);
+  if (keyword) url.searchParams.set("keyword", keyword);
+  const r = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data?._embedded?.events ?? [];
+}
+
+async function fetchTicketmasterNearby(lat, lng, nowIso) {
+  if (!TM_KEY || TM_KEY.includes("your_")) return [];
   try {
-    const r = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": GOOGLE_KEY,
-        "X-Goog-FieldMask":
-          "places.name,places.displayName,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.formattedAddress,places.types,places.id,places.websiteUri,places.photos",
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!r.ok) return [];
-    const data = await r.json();
-    const places = data.places ?? [];
-    return places.slice(0, 30).map((p) => {
-      const openNow =
-        p.currentOpeningHours?.openNow ?? p.regularOpeningHours?.openNow ?? undefined;
-      const plat = typeof p.location?.latitude === "number" ? p.location.latitude : null;
-      const plng = typeof p.location?.longitude === "number" ? p.location.longitude : null;
-      return {
-        name: p.displayName?.text ?? "",
-        resourceName: typeof p.name === "string" ? p.name : "",
-        lat: plat,
-        lng: plng,
-        rating: typeof p.rating === "number" ? p.rating : null,
-        reviews: typeof p.userRatingCount === "number" ? p.userRatingCount : null,
-        address: p.formattedAddress ?? "",
-        openNow: openNow === true ? true : openNow === false ? false : null,
-        nextCloseTime: p.currentOpeningHours?.nextCloseTime ?? null,
-        types: (p.types ?? []).slice(0, 6),
-        id: p.id ?? p.name ?? "",
-        websiteUri: p.websiteUri ?? "",
-        photos: (p.photos ?? []).map((ph) => ({
-          name: ph.name ?? "",
-          widthPx: ph.widthPx ?? null,
-          heightPx: ph.heightPx ?? null,
-        })),
-      };
-    });
+    const nowMs = nowIso ? new Date(nowIso).getTime() : Date.now();
+    const startIso = new Date(nowMs - 15 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const endIso = new Date(nowMs + 5 * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const horizon = nowMs + 6 * 86400000;
+    const perQuerySize = 12;
+
+    const batches = await Promise.all(
+      TM_PARALLEL_QUERIES.map((q) =>
+        fetchTicketmasterDiscoverySegment(lat, lng, startIso, endIso, {
+          segmentId: q.segmentId,
+          keyword: q.keyword,
+          size: perQuerySize,
+        }).catch(() => [])
+      )
+    );
+
+    const byId = new Map();
+    for (const rawEvents of batches) {
+      for (const e of rawEvents) {
+        if (isTmDiscoveryEventCancelledOrBad(e)) continue;
+        const start = getEventStartMs(e);
+        if (start == null || start < nowMs - 15 * 60 * 1000 || start > horizon) continue;
+        const row = mapTmDiscoveryEventToRecord(e);
+        if (!row || byId.has(row.id)) continue;
+        byId.set(row.id, row);
+      }
+    }
+
+    const merged = [...byId.values()].sort(
+      (a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0)
+    );
+    return merged.slice(0, 80);
   } catch {
     return [];
   }
@@ -432,6 +491,10 @@ function filterSafetyMacArthur(suggestions, hour24) {
 function filterClosedVenuePlaces(suggestions, nearbyPlaces) {
   const out = [];
   for (const s of suggestions) {
+    if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") {
+      out.push(s);
+      continue;
+    }
     if (String(s.ticketEventId || "").trim()) {
       out.push(s);
       continue;
@@ -455,6 +518,7 @@ function filterClosedVenuePlaces(suggestions, nearbyPlaces) {
 
 function attachPlaceResourceNames(suggestions, nearbyPlaces) {
   return suggestions.map((s) => {
+    if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") return s;
     const place = matchNearbyPlace(s, nearbyPlaces);
     if (place?.resourceName) {
       return { ...s, googlePlaceResourceName: String(place.resourceName).trim() };
@@ -533,13 +597,20 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
     const show = String(e.name || "").trim();
     const title = venue ? `${show} at ${venue}`.slice(0, 120) : show.slice(0, 120);
     const when = formatTicketmasterStartLine(e);
+    const whenLab = String(e.whenLabel || "").trim();
+    const whenLead =
+      whenLab && whenLab !== "Tonight" && when
+        ? `${whenLab} — ${when}`
+        : whenLab && whenLab !== "Tonight" && !when
+          ? whenLab
+          : when;
     const genre = String(e.genre || "").trim();
     const seg = String(e.segment || "").trim();
     const genreBit = genre && seg && genre !== seg ? `${genre}, ${seg}` : genre || seg;
     const priceBit = String(e.priceLabel || "").trim();
     const descParts = [
       show + (genreBit ? `. ${genreBit}.` : "."),
-      when ? ` ${when}.` : "",
+      whenLead ? ` ${whenLead}.` : "",
       venue ? ` ${venue}.` : "",
       priceBit ? ` Tickets from ${priceBit}.` : "",
     ];
@@ -559,7 +630,7 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
       ticketUrl: url,
       ticketEventId: id,
       mapQuery: venue ? `${venue} ${areaLabel}`.slice(0, 200) : s.mapQuery,
-      startTime: when || s.startTime,
+      startTime: whenLead || when || s.startTime,
       category: "event",
       cost: String(costLine || s.cost || "").slice(0, 48),
     };
@@ -569,6 +640,13 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
 function attachPlaceMeta(suggestions, nearbyPlaces, nowIso) {
   const now = new Date(nowIso).getTime();
   return suggestions.map((s) => {
+    if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") {
+      return {
+        ...s,
+        placeOpenNow: null,
+        closesSoon: false,
+      };
+    }
     const place = matchNearbyPlace(s, nearbyPlaces);
     if (!place) {
       return { ...s, placeOpenNow: null, closesSoon: false };
@@ -654,6 +732,7 @@ function buildGptUserPayload({
   lat,
   lng,
   userContextLine,
+  deckCategoryFocus,
 }) {
   const interestPayload = buildInterestEnrichment(interests);
   const timeBucket = getTimeOfDayBucket(wall.hour24);
@@ -667,9 +746,7 @@ function buildGptUserPayload({
     timeBudget === "30min" ? "~30 min" : timeBudget === "mid" ? "1–3 hours" : "Flexible / all day";
 
   const nearby_places = (nearbyPlacesAnnotated || [])
-    .slice()
-    .sort((a, b) => (a.distanceMiles ?? 999) - (b.distanceMiles ?? 999))
-    .slice(0, 42)
+    .slice(0, 25)
     .map((p) => ({
       name: p.name,
       distance_miles:
@@ -687,6 +764,7 @@ function buildGptUserPayload({
     name: e.name,
     venue: e.venue,
     start: e.startIso || `${e.localDate} ${e.localTime || ""}`.trim(),
+    when_label: e.whenLabel || "",
     url: e.url,
     price: e.priceLabel || "",
     genre: e.genre,
@@ -729,6 +807,10 @@ function buildGptUserPayload({
   }
   if (userContextLine && String(userContextLine).trim()) {
     base.user_context_line = String(userContextLine).trim().slice(0, 800);
+  }
+  const focus = String(deckCategoryFocus || "").trim();
+  if (focus) {
+    base.deck_category_focus = focus;
   }
 
   return base;
@@ -777,10 +859,16 @@ function normalizeSuggestions(raw) {
         ? ""
         : String(whyRaw === false ? "" : whyRaw).trim();
 
+    const sourceTypeRaw = String(s.sourceType || s.source_type || "places_or_events")
+      .trim()
+      .toLowerCase();
+    const sourceType =
+      sourceTypeRaw === "gpt_knowledge" ? "gpt_knowledge" : "places_or_events";
     const row = {
       title: title.slice(0, 120),
       description: description.slice(0, 400),
       category: String(s.category || "experience").slice(0, 32),
+      sourceType,
       deckRole: deckRole.slice(0, 24),
       flavorTag: String(s.flavorTag || "").slice(0, 32),
       timeRequired: String(s.timeRequired || "").slice(0, 32),
@@ -821,6 +909,13 @@ export async function runConciergeRecommendations(body) {
   const timeBudget = ["30min", "mid", "allday"].includes(body.timeBudget) ? body.timeBudget : "mid";
   const areaLabel = String(body.areaLabel || body.area || "near you").slice(0, 80);
   const interests = Array.isArray(body.interests) ? body.interests.map((x) => String(x)).slice(0, 24) : [];
+  const deckCategoryFocus =
+    typeof body.deckCategoryFocus === "string"
+      ? body.deckCategoryFocus
+      : typeof body.deck_category_focus === "string"
+        ? body.deck_category_focus
+        : "";
+  console.log("🎯 User interests loaded:", interests);
   const recentSuggestions = Array.isArray(body.recentSuggestions)
     ? body.recentSuggestions.map((x) => String(x)).slice(0, 20)
     : [];
@@ -847,17 +942,31 @@ export async function runConciergeRecommendations(body) {
 
   const wall = wallPartsFromIso(nowIso, timeZone);
 
+  if (interests.length === 0) {
+    throw new Error(
+      "Add at least one interest (menu → Interests) so we can personalize your deck."
+    );
+  }
+
+  const nowMs = new Date(nowIso).getTime();
   const [weather, ticketmasterRecordsRaw, nearbyPlacesRaw] = await Promise.all([
     fetchWeatherSummary(lat, lng),
-    fetchTicketmasterNearby(lat, lng),
-    fetchPlacesNearbyDigest(lat, lng),
+    fetchTicketmasterNearby(lat, lng, nowIso),
+    fetchPlacesWideNet(lat, lng, GOOGLE_KEY, interests),
   ]);
   let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
   nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
-  const ticketmasterRecords = filterTicketmasterToLocalToday(ticketmasterRecordsRaw, nowIso, timeZone);
+  let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 7)
+    .slice()
+    .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0))
+    .slice(0, 20);
+  ticketmasterRecords = ticketmasterRecords.map((r) => ({
+    ...r,
+    whenLabel: computeEventWhenLabel(r, nowIso, timeZone),
+  }));
 
   const ticketmasterEvents = ticketmasterRecords.map(
-    ({ id, name, venue, startIso, localDate, localTime, url, segment, genre, priceLabel }) => ({
+    ({
       id,
       name,
       venue,
@@ -868,6 +977,19 @@ export async function runConciergeRecommendations(body) {
       segment,
       genre,
       priceLabel,
+      whenLabel,
+    }) => ({
+      id,
+      name,
+      venue,
+      startIso,
+      localDate,
+      localTime,
+      url,
+      segment,
+      genre,
+      priceLabel,
+      whenLabel,
       requiredCardTitle: `${name} at ${venue}`.slice(0, 120),
     })
   );
@@ -889,6 +1011,7 @@ export async function runConciergeRecommendations(body) {
     lat,
     lng,
     userContextLine,
+    deckCategoryFocus,
   });
 
   const openaiKey = process.env.OPENAI_API_KEY?.trim();

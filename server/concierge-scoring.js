@@ -72,6 +72,7 @@ function actionabilityScore(s, place, distanceMiles, hour24) {
 }
 
 function verifiedScore(s, place) {
+  if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") return 18;
   if (String(s.ticketEventId || "").trim()) return 25;
   if (place && place.openNow === true) return 25;
   if (place && place.openNow === false) return 0;
@@ -144,8 +145,10 @@ export function scoreConciergeSuggestion(s, ctx) {
   const maxPrimary = hour24 >= 22 || hour24 < 6 ? 1.25 : 3.5;
   const cat = String(s.category || "").toLowerCase();
   const isTm = Boolean(String(s.ticketEventId || "").trim());
+  const isGptKnowledge = String(s.sourceType || "").toLowerCase() === "gpt_knowledge";
   if (
     !isTm &&
+    !isGptKnowledge &&
     distanceMiles != null &&
     distanceMiles > maxPrimary + 0.01 &&
     !/show|concert|ticket/i.test(blob)

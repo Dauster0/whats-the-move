@@ -18,6 +18,8 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import type { ConciergeEnergy, ConciergeSuggestion, ConciergeTimeBudget } from "../lib/concierge-types";
+import { DECK_FOCUS_EMOJI } from "../lib/deck-category-chips";
+import { USER_INTEREST_CHIPS } from "../lib/user-interests";
 import { font, radius, spacing } from "../lib/theme";
 import { getReadableLocation } from "../lib/location";
 import { getRecentConciergeTitles, pushRecentConciergeTitle } from "../lib/recent-concierge-storage";
@@ -113,6 +115,7 @@ function mapApiConciergeSuggestion(x: Record<string, unknown>): ConciergeSuggest
       x.placeOpenNow === true ? true : x.placeOpenNow === false ? false : null,
     closesSoon: Boolean(x.closesSoon),
     deckRole: x.deckRole != null ? String(x.deckRole) : undefined,
+    sourceType: x.sourceType != null ? String(x.sourceType) : undefined,
     cost: x.cost != null ? String(x.cost) : undefined,
     isTimeSensitive: x.isTimeSensitive === true,
     distanceText: x.distanceText != null ? String(x.distanceText) : undefined,
@@ -137,6 +140,11 @@ export default function HomeScreen() {
   }, [insets.top, insets.bottom]);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
 
+  const userInterestDeckChips = useMemo(() => {
+    const sel = new Set(preferences.interests ?? []);
+    return USER_INTEREST_CHIPS.filter((c) => sel.has(c.key));
+  }, [preferences.interests]);
+
   const [energy, setEnergy] = useState<ConciergeEnergy>("medium");
   const [timeBudget, setTimeBudget] = useState<ConciergeTimeBudget>("mid");
   const [suggestions, setSuggestions] = useState<ConciergeSuggestion[]>([]);
@@ -150,6 +158,8 @@ export default function HomeScreen() {
   const [savedRows, setSavedRows] = useState<SavedConciergeMove[]>([]);
   const [findingMoreDeck, setFindingMoreDeck] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Bias the next concierge request toward one interest category (chip). */
+  const [deckCategoryFocus, setDeckCategoryFocus] = useState<string | null>(null);
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
   const hasHadFocusOnce = useRef(false);
@@ -166,12 +176,16 @@ export default function HomeScreen() {
   }, [isLoaded, hasFinishedOnboarding]);
 
   const fetchDeckList = useCallback(async (): Promise<ConciergeSuggestion[]> => {
+    const prefs = preferencesRef.current;
+    const ints = prefs.interests ?? [];
+    if (ints.length === 0) {
+      throw new Error("Pick at least one interest (⋯ menu → Interests) so we can suggest moves.");
+    }
     const loc = await getReadableLocation();
     const place = loc.place || "near you";
     const recentSuggestions = await getRecentConciergeTitles();
     const nowIso = new Date().toISOString();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const prefs = preferencesRef.current;
     const excludeSuggestionKeys = await getExcludeSuggestionKeys();
     const swipeSignals = await getSwipeSignalsForApi();
 
@@ -186,25 +200,32 @@ export default function HomeScreen() {
         timeZone,
         energy,
         timeBudget,
-        interests: prefs.interests ?? [],
+        interests: ints,
         recentSuggestions,
         excludeSuggestionKeys,
         userContextLine: buildUserContextLine(prefs),
         hungerPreference: prefs.hungerPreference ?? "any",
         ageRange: prefs.ageRange ?? "prefer_not",
         swipeSignals: swipeSignals ?? undefined,
+        ...(deckCategoryFocus ? { deckCategoryFocus } : {}),
       }),
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return [];
+    if (!res.ok) {
+      throw new Error(
+        typeof data.error === "string" && data.error.trim()
+          ? data.error.trim()
+          : "Couldn’t load suggestions. Pull to try again."
+      );
+    }
     const rawList = Array.isArray(data.suggestions) ? data.suggestions : [];
     return dedupeWithinList(
       rawList.map((item: unknown) =>
         mapApiConciergeSuggestion(item && typeof item === "object" ? (item as Record<string, unknown>) : {})
       )
     );
-  }, [energy, timeBudget]);
+  }, [energy, timeBudget, deckCategoryFocus]);
 
   const load = useCallback(async (mode: LoadMode = "full") => {
     if (mode === "refresh") setRefreshing(true);
@@ -223,10 +244,10 @@ export default function HomeScreen() {
       if (list.length === 0) {
         if (mode !== "background") setError("Nothing came back—try refresh.");
       }
-    } catch {
+    } catch (e) {
       if (mode !== "background") {
         setSuggestions([]);
-        setError("Network hiccup. Pull to try again.");
+        setError(e instanceof Error ? e.message : "Network hiccup. Pull to try again.");
       }
     } finally {
       setLoading(false);
@@ -237,7 +258,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!isLoaded || !hasFinishedOnboarding) return;
     load("full");
-  }, [isLoaded, hasFinishedOnboarding, energy, timeBudget, load]);
+  }, [isLoaded, hasFinishedOnboarding, energy, timeBudget, deckCategoryFocus, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -267,6 +288,8 @@ export default function HomeScreen() {
       try {
         const list = await fetchDeckList();
         if (list.length > 0) pendingDeckRef.current = list;
+      } catch {
+        /* interests empty or network — skip prefetch */
       } finally {
         prefetchingNextDeckRef.current = false;
       }
@@ -288,6 +311,8 @@ export default function HomeScreen() {
           const list = await fetchDeckList();
           registerDeckKeys(list);
           setSuggestions(list);
+        } catch {
+          setError("Couldn’t load the next deck.");
         } finally {
           setFindingMoreDeck(false);
         }
@@ -550,6 +575,40 @@ export default function HomeScreen() {
             );
           })}
         </View>
+
+        {userInterestDeckChips.length > 0 ? (
+          <>
+            <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Steer this deck</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryChipScroll}
+              keyboardShouldPersistTaps="handled"
+            >
+              {userInterestDeckChips.map(({ key, label }) => {
+                const emoji = DECK_FOCUS_EMOJI[key] ?? "✨";
+                const active = deckCategoryFocus === key;
+                return (
+                  <Pressable
+                    key={key}
+                    style={[styles.categoryChip, active && styles.categoryChipActive]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setDeckCategoryFocus((prev) => (prev === key ? null : key));
+                    }}
+                  >
+                    <Text
+                      style={[styles.categoryChipText, active && styles.categoryChipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {emoji} {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        ) : null}
       </View>
 
       {loading && suggestions.length === 0 ? (
@@ -847,6 +906,34 @@ function createStyles(
       color: colors.text,
     },
     segmentTextActive: {
+      color: colors.textInverse,
+    },
+    categoryChipScroll: {
+      flexDirection: "row",
+      flexWrap: "nowrap",
+      gap: 8,
+      paddingVertical: 4,
+      paddingRight: spacing.md,
+    },
+    categoryChip: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgCard,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.bgDark,
+      borderColor: colors.bgDark,
+    },
+    categoryChipText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.text,
+      maxWidth: 220,
+    },
+    categoryChipTextActive: {
       color: colors.textInverse,
     },
     swipeHint: {

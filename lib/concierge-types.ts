@@ -29,6 +29,8 @@ export type ConciergeSuggestion = {
   flavorTag?: string;
   /** food | event | experience | wildcard | budget — deck slot from server */
   deckRole?: string;
+  /** places_or_events | gpt_knowledge — server */
+  sourceType?: string;
   cost?: string;
   isTimeSensitive?: boolean;
   distanceText?: string;
