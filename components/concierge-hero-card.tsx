@@ -7,7 +7,6 @@ import * as Linking from "expo-linking";
 import {
   Animated,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,21 +14,20 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
+import { truncateToTwoSentences } from "../lib/truncate-card-copy";
 import { colorsLight, font, radius, spacing } from "../lib/theme";
 
 type ThemeColors = typeof colorsLight;
 
-/** Photo strip height (fixed). Text panel grows below — never clip CTAs with a short flex slot. */
+/** Non-swipe: photo strip vs width. Swipe deck: image capped at 45% of card height (see imageZoneH). */
 const IMAGE_ZONE_RATIO = 0.46;
-/** Swipe deck: image dominates (~55–60%) for a single visual card. */
-const SWIPE_IMAGE_RATIO = 0.57;
 
-/** Use on horizontal `ScrollView` so the row is tall enough for the full card (image + text + CTAs). */
+/** Use when a horizontal list needs a min row height for a full hero card. */
 export function getConciergeCardMinHeight(width: number) {
   const pad = spacing.md;
   const innerW = width - pad * 2;
   const imageZoneH = Math.max(168, Math.round(innerW * IMAGE_ZONE_RATIO));
-  return imageZoneH + 400;
+  return imageZoneH + 320;
 }
 
 function categoryFallbackBackground(category: string) {
@@ -107,14 +105,10 @@ export function ConciergeHeroCard({
 }: Props) {
   const pad = spacing.md;
   const innerW = width - pad * 2;
-  const imgRatio =
-    swipeMode && s.imageLayout !== "poster"
-      ? SWIPE_IMAGE_RATIO
-      : IMAGE_ZONE_RATIO;
-  const imageZoneH = Math.max(
-    swipeMode && s.imageLayout !== "poster" ? 168 : 168,
-    Math.round(innerW * imgRatio)
-  );
+  const imageZoneH =
+    swipeMode && deckMaxHeight != null && deckMaxHeight > 0
+      ? Math.max(112, Math.round(deckMaxHeight * 0.45))
+      : Math.max(168, Math.round(innerW * IMAGE_ZONE_RATIO));
   const fallbackBg = categoryFallbackBackground(s.category);
   const poster = s.imageLayout === "poster";
   const isMovie = s.kind === "movie" || Boolean(s.showtimes?.length || s.tmdbId);
@@ -135,11 +129,7 @@ export function ConciergeHeroCard({
   const showRemote = Boolean(s.photoUrl) && !imgError;
   const showShimmer = Boolean(s.photoUrl) && !imgLoaded && !imgError;
 
-  const useSwipeScroll =
-    Boolean(swipeMode && deckMaxHeight != null && deckMaxHeight > 0);
-  const textScrollMax = useSwipeScroll
-    ? Math.max(130, deckMaxHeight! - imageZoneH - 14)
-    : 0;
+  const displayDescription = swipeMode ? truncateToTwoSentences(s.description) : s.description;
 
   const imageBlock = (
     <View style={[styles.imageZone, { height: imageZoneH, backgroundColor: fallbackBg }]}>
@@ -210,19 +200,19 @@ export function ConciergeHeroCard({
       ) : null}
 
       {!swipeMode ? <Text style={styles.category}>{s.category}</Text> : null}
-      <Text style={styles.title} numberOfLines={3}>
+      <Text style={styles.title} numberOfLines={swipeMode ? 2 : 3}>
         {displayTitle}
       </Text>
       {subLine ? (
-        <Text style={styles.venue} numberOfLines={2}>
+        <Text style={styles.venue} numberOfLines={swipeMode ? 1 : 2}>
           {subLine}
         </Text>
       ) : null}
       <Text
-        style={styles.description}
-        numberOfLines={useSwipeScroll ? undefined : swipeMode ? 7 : isMovie ? 5 : 4}
+        style={[styles.description, swipeMode && styles.descriptionSwipe]}
+        numberOfLines={swipeMode ? 4 : isMovie ? 5 : 4}
       >
-        {s.description}
+        {displayDescription}
       </Text>
 
       {s.distanceText || s.cost ? (
@@ -272,7 +262,7 @@ export function ConciergeHeroCard({
   );
 
   const footerBlock = (
-    <View style={styles.textPanelFooter}>
+    <View style={[styles.textPanelFooter, swipeMode && styles.textPanelFooterSwipe]}>
       {swipeMode ? null : ticketed ? (
         <View style={styles.ctaRow}>
           <Pressable
@@ -310,8 +300,6 @@ export function ConciergeHeroCard({
       )}
       {swipeMode && isMovie && s.showtimes?.length ? (
         <Text style={styles.swipeHintFooter}>Tap a time to book · swipe right for full detail</Text>
-      ) : swipeMode ? (
-        <Text style={styles.swipeHintFooter}>Swipe right for detail · left to skip</Text>
       ) : null}
     </View>
   );
@@ -345,34 +333,17 @@ export function ConciergeHeroCard({
               />
             </Pressable>
           ) : null}
-          {useSwipeScroll ? (
-            <>
+          <>
+            <Pressable
+              disabled={!onCardPress}
+              onPress={onCardPress}
+              style={({ pressed }) => [pressed && onCardPress ? { opacity: 0.98 } : null]}
+            >
               {imageBlock}
-              <ScrollView
-                style={{ maxHeight: textScrollMax }}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                bounces
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 10 }}
-              >
-                <View style={[styles.textBody, styles.textBodySwipe]}>{textBodyInner}</View>
-                {footerBlock}
-              </ScrollView>
-            </>
-          ) : (
-            <>
-              <Pressable
-                disabled={!onCardPress}
-                onPress={onCardPress}
-                style={({ pressed }) => [pressed && onCardPress ? { opacity: 0.98 } : null]}
-              >
-                {imageBlock}
-                <View style={styles.textBody}>{textBodyInner}</View>
-              </Pressable>
-              {footerBlock}
-            </>
-          )}
+              <View style={[styles.textBody, swipeMode && styles.textBodySwipe]}>{textBodyInner}</View>
+            </Pressable>
+            {footerBlock}
+          </>
         </View>
       </View>
     </View>
@@ -470,6 +441,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     paddingTop: 4,
   },
+  textPanelFooterSwipe: {
+    paddingTop: 0,
+    paddingBottom: spacing.sm,
+  },
   whyBlock: {
     marginBottom: spacing.sm,
     paddingLeft: 10,
@@ -550,12 +525,17 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "rgba(255,255,255,0.88)",
   },
+  descriptionSwipe: {
+    marginTop: 6,
+    fontSize: font.sizeSm,
+    lineHeight: 19,
+  },
   tagRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-    marginBottom: 14,
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 8,
   },
   tag: {
     fontSize: 12,

@@ -5,8 +5,8 @@ import { router, useFocusEffect, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -127,14 +127,13 @@ export default function HomeScreen() {
     [colors, insets.top, insets.bottom]
   );
 
-  /** Fits between filters and ✕/✓ row; card body scrolls inside if copy is long. */
+  /** Deck fits between filters and ✕/✓ on iPhone 14-class screens (conservative reserve). */
   const DECK_HEIGHT = useMemo(() => {
-    const headerFiltersHint = 292;
-    const deckButtonRow = 64;
-    const gap = 12;
-    const available =
-      SCREEN_H - insets.top - insets.bottom - headerFiltersHint - deckButtonRow - gap;
-    return Math.max(320, Math.min(660, available));
+    const reservedAboveDeck = 352;
+    const deckButtonsAndGap = 80;
+    const raw =
+      SCREEN_H - insets.top - insets.bottom - reservedAboveDeck - deckButtonsAndGap;
+    return Math.max(300, Math.min(458, raw));
   }, [insets.top, insets.bottom]);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
 
@@ -150,6 +149,7 @@ export default function HomeScreen() {
   const [bookmarkSaved, setBookmarkSaved] = useState(false);
   const [savedRows, setSavedRows] = useState<SavedConciergeMove[]>([]);
   const [findingMoreDeck, setFindingMoreDeck] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
   const hasHadFocusOnce = useRef(false);
@@ -354,13 +354,7 @@ export default function HomeScreen() {
   }, [suggestions]);
 
   function openMenu() {
-    Alert.alert("Elsewhere", undefined, [
-      { text: "Interests", onPress: () => router.push("/edit-interests") },
-      { text: "Your details", onPress: () => router.push("/my-context" as Href) },
-      { text: "Saved moves", onPress: () => router.push("/saved-moves") },
-      { text: "Shuffle deck", onPress: () => router.push("/suggestions") },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    setMenuOpen(true);
   }
 
   if (!isLoaded) {
@@ -395,10 +389,58 @@ export default function HomeScreen() {
         <Text style={styles.areaPill} numberOfLines={1}>
           {areaLabel || "Near you"}
         </Text>
-        <Pressable style={styles.menuBtn} onPress={openMenu} hitSlop={10}>
+        <Pressable
+          style={styles.menuBtn}
+          onPress={() => {
+            Haptics.selectionAsync();
+            openMenu();
+          }}
+          hitSlop={10}
+        >
           <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
         </Pressable>
       </View>
+
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <View style={styles.menuRoot}>
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
+          <View style={styles.menuSheetContainer} pointerEvents="box-none">
+            <View style={styles.menuSheet}>
+              <Text style={styles.menuSheetTitle}>Elsewhere</Text>
+              {(
+                [
+                  { label: "Interests", href: "/edit-interests" as const },
+                  { label: "Your details", href: "/my-context" as Href },
+                  { label: "Saved moves", href: "/saved-moves" as const },
+                ] as const
+              ).map((item, i, arr) => (
+                <View key={item.label}>
+                  <Pressable
+                    style={styles.menuRow}
+                    onPress={() => {
+                      setMenuOpen(false);
+                      router.push(item.href);
+                    }}
+                  >
+                    <Text style={styles.menuRowText}>{item.label}</Text>
+                  </Pressable>
+                  {i < arr.length - 1 ? <View style={styles.menuSep} /> : null}
+                </View>
+              ))}
+              <View style={styles.menuCancelWrap}>
+                <Pressable style={styles.menuCancelBtn} onPress={() => setMenuOpen(false)}>
+                  <Text style={styles.menuCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Text style={styles.screenTitle}>{"What's the move?"}</Text>
 
@@ -857,6 +899,64 @@ function createStyles(
       color: colors.textInverse,
       fontWeight: "700",
       fontSize: 15,
+    },
+    menuRoot: {
+      flex: 1,
+    },
+    menuBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(0,0,0,0.55)",
+    },
+    menuSheetContainer: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    menuSheet: {
+      backgroundColor: "#1a1a1a",
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingTop: 18,
+      paddingBottom: bottomPad + 6,
+    },
+    menuSheetTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: "rgba(255,255,255,0.45)",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      paddingHorizontal: spacing.lg,
+      marginBottom: 8,
+    },
+    menuRow: {
+      paddingVertical: 16,
+      paddingHorizontal: spacing.lg,
+    },
+    menuRowText: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: "#FFFFFF",
+    },
+    menuSep: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: spacing.lg,
+      backgroundColor: "rgba(255,255,255,0.1)",
+    },
+    menuCancelWrap: {
+      marginTop: 8,
+      paddingTop: 12,
+      paddingBottom: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: "rgba(255,255,255,0.08)",
+    },
+    menuCancelBtn: {
+      paddingVertical: 18,
+      paddingHorizontal: spacing.lg,
+    },
+    menuCancelText: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: "rgba(255,255,255,0.55)",
+      textAlign: "center",
     },
   });
 }

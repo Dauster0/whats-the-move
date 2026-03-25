@@ -4,22 +4,85 @@ import { conciergeSuggestionKey } from "./concierge-suggestion-key";
 
 const KEY = "concierge_shown_ids_v1";
 const MAX_PERSISTED = 20;
+const TODAY_KEY = "concierge_shown_today_v1";
+const MAX_TODAY = 18;
 
-/** Every suggestion key that has appeared in a deck this app session (excluded from new fetches). */
-const sessionDeckKeys = new Set<string>();
+function norm(s: string) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-async function loadPersisted(): Promise<string[]> {
+/** In-memory only — clears when the JS runtime is torn down (app fully closed). */
+const sessionExcludeSet = new Set<string>();
+
+function formatYmd() {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/** Keys + place-name markers (n:...) for this app session — never cleared on deck refresh. */
+export function collectExcludeMarkersForSuggestion(s: ConciergeSuggestion): string[] {
+  const out: string[] = [];
+  const k = conciergeSuggestionKey(s);
+  if (k) out.push(k);
+  const sn = norm(s.sourcePlaceName);
+  if (sn.length >= 3) out.push(`n:${sn}`);
+  const title = s.title || "";
+  const at = title.toLowerCase().indexOf(" at ");
+  if (at >= 0) {
+    const venue = norm(title.slice(at + 4));
+    if (venue.length >= 3) out.push(`n:${venue}`);
+  }
+  return out;
+}
+
+function registerMarkersToSession(markers: string[]) {
+  for (const m of markers) {
+    if (m) sessionExcludeSet.add(m);
+  }
+}
+
+async function loadTodayMarkers(): Promise<string[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await AsyncStorage.getItem(TODAY_KEY);
     if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+    const data = JSON.parse(raw) as { ymd?: string; items?: string[] };
+    if (data?.ymd !== formatYmd() || !Array.isArray(data.items)) return [];
+    return data.items.filter((x) => typeof x === "string");
   } catch {
     return [];
   }
 }
 
-async function savePersisted(ids: string[]) {
+async function mergeTodayMarkers(markers: string[]) {
+  if (markers.length === 0) return;
+  try {
+    const ymd = formatYmd();
+    const prev = await loadTodayMarkers();
+    const next = [...new Set([...markers, ...prev])].slice(0, MAX_TODAY);
+    await AsyncStorage.setItem(TODAY_KEY, JSON.stringify({ ymd, items: next }));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function loadPersistedSwipeKeys(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x: unknown) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+async function savePersistedSwipeKeys(ids: string[]) {
   try {
     await AsyncStorage.setItem(KEY, JSON.stringify(ids.slice(0, MAX_PERSISTED)));
   } catch {
@@ -27,28 +90,35 @@ async function savePersisted(ids: string[]) {
   }
 }
 
-/** Keys to exclude from concierge API (session + last N swipes across launches). */
+/** Keys to exclude from concierge API: session (until app kill) + today's deck + swipe history. */
 export async function getExcludeSuggestionKeys(): Promise<string[]> {
-  const persisted = await loadPersisted();
-  return [...new Set([...persisted, ...sessionDeckKeys])];
+  const persisted = await loadPersistedSwipeKeys();
+  const today = await loadTodayMarkers();
+  return [...new Set([...sessionExcludeSet, ...today, ...persisted])];
 }
 
-/** Call whenever a new deck is applied so we never repeat in the same session. */
+/** Call when a new deck is applied — session + today's persisted list grow; not cleared on reset. */
 export function registerDeckKeys(list: ConciergeSuggestion[]) {
+  const batch: string[] = [];
   for (const s of list) {
-    const k = conciergeSuggestionKey(s);
-    if (k) sessionDeckKeys.add(k);
+    const m = collectExcludeMarkersForSuggestion(s);
+    batch.push(...m);
+    registerMarkersToSession(m);
   }
+  void mergeTodayMarkers(batch);
 }
 
-/** Swipe left/right — persist for cross-session variety. */
+/** Swipe left/right — persist canonical keys for cross-session variety. */
 export function persistSwipeForHistory(s: ConciergeSuggestion) {
+  const markers = collectExcludeMarkersForSuggestion(s);
+  registerMarkersToSession(markers);
+  void mergeTodayMarkers(markers);
   const k = conciergeSuggestionKey(s);
   if (!k) return;
   void (async () => {
-    const prev = await loadPersisted();
+    const prev = await loadPersistedSwipeKeys();
     const next = [k, ...prev.filter((x) => x !== k)].slice(0, MAX_PERSISTED);
-    await savePersisted(next);
+    await savePersistedSwipeKeys(next);
   })();
 }
 

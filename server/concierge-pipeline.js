@@ -250,10 +250,174 @@ function buildSuggestionKey(s) {
   return `t:${t}|${mq}`;
 }
 
+/** Same keys as app `USER_INTEREST_CHIPS` — keep in sync for positive/negative lists. */
+const ALL_INTEREST_ENTRIES = [
+  ["walking", "Walking"],
+  ["hikes", "Hikes & trails"],
+  ["coffee", "Coffee"],
+  ["dessert", "Dessert"],
+  ["exploring", "Exploring"],
+  ["bookstores", "Bookstores"],
+  ["museums", "Museums"],
+  ["movies", "Movies"],
+  ["theater", "Theater & plays"],
+  ["live-music", "Live music"],
+  ["concerts", "Concerts"],
+  ["comedy", "Comedy"],
+  ["improv", "Improv"],
+  ["karaoke", "Karaoke"],
+  ["dancing", "Dancing"],
+  ["trivia", "Trivia nights"],
+  ["nightlife", "Nightlife"],
+  ["sports", "Sports"],
+  ["bowling", "Bowling"],
+  ["arcade", "Arcade"],
+  ["farmers-markets", "Farmers markets"],
+  ["rooftops", "Rooftops"],
+  ["working out", "Working out"],
+  ["beach", "Beach"],
+  ["journaling", "Journaling"],
+  ["reading", "Reading"],
+  ["calling friends", "Calling friends"],
+  ["solo-recharge", "Solo recharge"],
+  ["cheap-hangouts", "Cheap hangouts"],
+];
+
+function buildInterestEnrichment(userInterests) {
+  const selected = new Set((userInterests || []).map((x) => String(x).toLowerCase().trim()));
+  const positive = (userInterests || []).map((x) => String(x));
+  const not_interested_in = ALL_INTEREST_ENTRIES.filter(([k]) => !selected.has(String(k).toLowerCase())).map(
+    ([, label]) => label
+  );
+  return { positive_interests: positive, not_interested_in };
+}
+
+function interestSetHasMuseums(interests) {
+  return (interests || []).some((i) => String(i).toLowerCase().trim() === "museums");
+}
+
+function filterPlacesByInterestPolicy(places, interests) {
+  if (interestSetHasMuseums(interests)) return places;
+  return (places || []).filter((p) => {
+    const types = p.types || [];
+    return !types.includes("museum") && !types.includes("art_gallery");
+  });
+}
+
+function getTimeOfDayBucket(hour24) {
+  if (hour24 >= 2 && hour24 < 6) return "late_night";
+  if (hour24 >= 6 && hour24 < 11) return "morning";
+  if (hour24 >= 11 && hour24 < 17) return "afternoon";
+  if (hour24 >= 17 && hour24 < 21) return "evening";
+  return "night";
+}
+
+const MEAL_TIMING_RULES_FOR_MODEL = `MEAL & TIME HARD RULES (local time in JSON):
+- Never suggest breakfast after 11am (unless explicitly all-day breakfast).
+- Never suggest lunch before 11am or after 3pm as a "lunch" primary pick.
+- Never suggest dinner before 5pm — at 2pm do not pitch a dinner spot; use lunch, cafe, park, walk, matinee, etc.
+- Never suggest "late-night" food before 9pm (e.g. BCD Tofu House is late-night Korean — do not suggest before 8pm).
+- Morning 6–11: coffee, breakfast, farmers markets, early walks, bookstores.
+- Afternoon 11–5: lunch, parks, beaches, neighborhoods, matinee shows, cafes — NOT dinner-as-default.
+- Evening 5–9: dinner, happy hour, early shows, sunset spots.
+- Night 9–2: late-night food, bars, concerts, comedy, night walks, 24h spots.
+- Late night 2–6: only 24-hour diners, safe gas-station coffee, night drives — very limited.`;
+
+function suggestionLooksMuseumLike(s, place) {
+  const types = place?.types || [];
+  if (types.includes("museum") || types.includes("art_gallery")) return true;
+  const b = `${s.title} ${s.mapQuery} ${s.sourcePlaceName}`.toLowerCase();
+  return (
+    /\bmuseum\b/.test(b) ||
+    /\bthe broad\b/.test(b) ||
+    /\bgetty (center|villa)\b/.test(b) ||
+    /\blacma\b/.test(b) ||
+    /\bmoca\b/.test(b)
+  );
+}
+
+function eventRecordMatchesUserInterests(record, interestSet) {
+  if (!record) return false;
+  const g = `${record.genre || ""} ${record.segment || ""}`.toLowerCase();
+  if (/music|concert|indie|rock|dj|band|festival/.test(g)) {
+    if (
+      interestSet.has("live-music") ||
+      interestSet.has("concerts") ||
+      interestSet.has("nightlife")
+    )
+      return true;
+  }
+  if (/comedy|stand[\s-]?up/.test(g)) {
+    if (interestSet.has("comedy") || interestSet.has("improv")) return true;
+  }
+  if (/theater|theatre|performance|broadway/.test(g)) {
+    if (interestSet.has("theater") || interestSet.has("live-music")) return true;
+  }
+  return false;
+}
+
+function filterMuseumInterestPolicy(suggestions, interests, records, nearbyPlaces) {
+  const set = new Set((interests || []).map((x) => String(x).toLowerCase().trim()));
+  const allowMuseums = set.has("museums");
+  const byId = new Map(records.map((r) => [r.id, r]));
+  return suggestions.filter((s) => {
+    const place = matchNearbyPlace(s, nearbyPlaces);
+    if (!suggestionLooksMuseumLike(s, place)) return true;
+    if (allowMuseums) return true;
+    const tid = String(s.ticketEventId || "").trim();
+    if (tid && byId.has(tid) && eventRecordMatchesUserInterests(byId.get(tid), set)) return true;
+    return false;
+  });
+}
+
+function filterMealAndLateNightHeuristics(suggestions, hour24) {
+  return suggestions.filter((s) => {
+    const b = `${s.title} ${s.description} ${s.mapQuery} ${s.sourcePlaceName}`.toLowerCase();
+    const cat = String(s.category || "").toLowerCase();
+
+    if (/bcd\s*tofu/.test(b) && hour24 < 20) return false;
+    if (/sun\s*nong\s*dan/.test(b) && hour24 < 21) return false;
+
+    if (hour24 >= 2 && hour24 < 6) {
+      const allow =
+        Boolean(String(s.ticketEventId || "").trim()) ||
+        /\b(24[\s-]?hour|24hr|diner|denny'?s?|ihop|waffle|gas station|night drive)\b/i.test(b);
+      if (!allow) return false;
+    }
+
+    if (hour24 > 11 && /\b(breakfast)\b/.test(b) && !/\b(all[-\s]?day|24)\b/.test(b)) return false;
+    if (hour24 > 15 && /\b(brunch)\b/.test(b) && !/\b(all[-\s]?day)\b/.test(b)) return false;
+    if (hour24 < 11 && /\b(lunch)\b/.test(b) && !/\b(all[-\s]?day)\b/.test(b)) return false;
+
+    if (hour24 >= 11 && hour24 < 17 && cat === "eat") {
+      if (/\bdinner\b/.test(b) && !/\b(lunch|brunch|afternoon|open for lunch|lunch and)\b/.test(b)) {
+        return false;
+      }
+    }
+    if (hour24 < 21 && hour24 >= 5 && cat === "eat") {
+      if (/\blate[-\s]?night\b/.test(b)) return false;
+    }
+
+    return true;
+  });
+}
+
 function filterExcludedKeys(suggestions, excludeKeys) {
   const ex = new Set((excludeKeys || []).map((x) => String(x)));
   if (ex.size === 0) return suggestions;
-  return suggestions.filter((s) => !ex.has(buildSuggestionKey(s)));
+  const nameParts = [];
+  for (const k of ex) {
+    const ks = String(k);
+    if (ks.startsWith("n:")) nameParts.push(ks.slice(2).toLowerCase().trim());
+  }
+  return suggestions.filter((s) => {
+    if (ex.has(buildSuggestionKey(s))) return false;
+    const blob = `${s.title} ${s.mapQuery} ${s.sourcePlaceName}`.toLowerCase();
+    for (const np of nameParts) {
+      if (np.length >= 4 && blob.includes(np)) return false;
+    }
+    return true;
+  });
 }
 
 function filterSafetyMacArthur(suggestions, hour24) {
@@ -491,6 +655,8 @@ function buildGptUserPayload({
   lng,
   userContextLine,
 }) {
+  const interestPayload = buildInterestEnrichment(interests);
+  const timeBucket = getTimeOfDayBucket(wall.hour24);
   const tempC = weather?.tempC;
   const tempF = typeof tempC === "number" ? Math.round((tempC * 9) / 5 + 32) : null;
   const weatherLine =
@@ -542,10 +708,15 @@ function buildGptUserPayload({
     weather: weatherLine,
     user_age: userAge,
     interests,
+    positive_interests: interestPayload.positive_interests,
+    not_interested_in: interestPayload.not_interested_in,
     recent_moves: recentSuggestions,
     nearby_events,
     nearby_places,
     local_hour: hour,
+    time_of_day_bucket: timeBucket,
+    it_is_currently: `It is currently ${formatLocalClock(nowIso, timeZone)} on ${formatLocalWeekday(nowIso, timeZone)}. Every suggestion must make sense for this exact moment.`,
+    meal_timing_rules: MEAL_TIMING_RULES_FOR_MODEL,
     late_night: lateNight,
     distance_guidance: lateNight
       ? "After 10pm: strongly prefer venues within ~1 mile unless a ticketed show justifies farther."
@@ -681,7 +852,8 @@ export async function runConciergeRecommendations(body) {
     fetchTicketmasterNearby(lat, lng),
     fetchPlacesNearbyDigest(lat, lng),
   ]);
-  const nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
+  let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
+  nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
   const ticketmasterRecords = filterTicketmasterToLocalToday(ticketmasterRecordsRaw, nowIso, timeZone);
 
   const ticketmasterEvents = ticketmasterRecords.map(
@@ -767,6 +939,14 @@ export async function runConciergeRecommendations(body) {
   if (suggestions.length === 0) {
     throw new Error("No valid suggestions after grounding ticketed events");
   }
+
+  const beforeInterestMeal = suggestions.slice();
+  suggestions = filterMuseumInterestPolicy(suggestions, interests, ticketmasterRecords, nearbyPlaces);
+  if (suggestions.length < 2) suggestions = beforeInterestMeal;
+
+  const beforeMeal = suggestions.slice();
+  suggestions = filterMealAndLateNightHeuristics(suggestions, wall.hour24);
+  if (suggestions.length < 2) suggestions = beforeMeal;
 
   suggestions = filterAndSortByScore(suggestions, {
     hour24: wall.hour24,
