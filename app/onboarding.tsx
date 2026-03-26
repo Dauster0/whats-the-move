@@ -1553,86 +1553,84 @@ const ig = StyleSheet.create({
 
 // ─── Screen 14 — Budget ───────────────────────────────────────────────────────
 
-function budgetDescriptor(amount: number): string {
-  if (amount <= 15) return "Some of the best nights in LA are free. We know exactly where they are.";
-  if (amount <= 30) return "Plenty to work with. You'd be surprised what's out there.";
-  if (amount <= 60) return "That's a good night right there. We'll make sure it earns it.";
-  if (amount <= 100) return "We'll find you something genuinely worth it.";
-  return "We'll find you the move that matches the energy.";
-}
+type BudgetOption = "free" | "cheap" | "splurge" | "varies";
+
+const BUDGET_OPTIONS: { key: BudgetOption; label: string }[] = [
+  { key: "free",    label: "Free or close to it — $0 to $15" },
+  { key: "cheap",   label: "A little to spend — $15 to $30" },
+  { key: "splurge", label: "Worth it money — $30 and up" },
+  { key: "varies",  label: "It varies" },
+];
 
 function BudgetScreen({
   shellStep,
   value,
-  onChange,
+  onSelect,
   onContinue,
   onBack,
 }: {
   shellStep: number;
-  value: number;
-  onChange: (v: number) => void;
+  value: BudgetOption | null;
+  onSelect: (v: BudgetOption) => void;
   onContinue: () => void;
   onBack: () => void;
 }) {
-  const displayAmt = value >= 150 ? "$100+" : `$${value}`;
-  const descriptor = budgetDescriptor(value);
-
   return (
     <Shell
       step={shellStep}
-      canContinue={true}
+      canContinue={value !== null}
       continueLabel="That works →"
       onContinue={onContinue}
       onBack={onBack}
     >
       <Text style={sc.headline}>{"What's your usual\nbudget for a night out?"}</Text>
+      <Text style={sc.subhead}>No judgment — this just helps us find the right moves.</Text>
 
-      <View style={bu.amountWrap}>
-        <Text style={bu.amount}>{displayAmt}</Text>
-        <Text style={bu.descriptor}>{descriptor}</Text>
-      </View>
-
-      <CustomSlider value={value} min={0} max={150} onChange={onChange} />
-
-      <View style={bu.rangeRow}>
-        <Text style={bu.rangeText}>Free</Text>
-        <Text style={bu.rangeText}>$100+</Text>
+      <View style={bu.pills}>
+        {BUDGET_OPTIONS.map((opt) => {
+          const selected = value === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              style={[bu.pill, selected && bu.pillSelected]}
+              activeOpacity={0.75}
+              onPress={() => onSelect(opt.key)}
+            >
+              <Text style={[bu.pillText, selected && bu.pillTextSelected]}>{opt.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </Shell>
   );
 }
 
 const bu = StyleSheet.create({
-  amountWrap: {
+  pills: {
+    marginTop: 32,
+    gap: 12,
+  },
+  pill: {
+    width: "100%",
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: CARD,
+    borderWidth: 1.5,
+    borderColor: "#2A2A2A",
     alignItems: "center",
-    marginTop: 36,
-    marginBottom: 8,
-    paddingHorizontal: 8,
   },
-  amount: {
-    fontSize: 80,
-    fontWeight: "800",
-    color: WHITE,
-    letterSpacing: -3,
-    lineHeight: 88,
+  pillSelected: {
+    borderColor: PEACH,
+    backgroundColor: "#2C1810",
   },
-  descriptor: {
-    fontSize: 14,
+  pillText: {
+    fontSize: 16,
+    fontWeight: "600",
     color: MUTED_LIGHT,
-    textAlign: "center",
-    lineHeight: 20,
-    marginTop: 10,
-    minHeight: 42,
   },
-  rangeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  rangeText: {
-    fontSize: 12,
-    color: MUTED,
-    fontWeight: "500",
+  pillTextSelected: {
+    color: PEACH,
   },
 });
 
@@ -1643,29 +1641,29 @@ type SocialStyle = "solo" | "small_group" | "big_group" | "depends" | null;
 const SOCIAL_OPTIONS: { key: SocialStyle; icon: string; label: string; sub: string; confirm: string }[] = [
   {
     key: "solo",
-    icon: "🧍",
-    label: "Solo",
-    sub: "I like doing things on my own terms",
+    icon: "🎧",
+    label: "Flying solo",
+    sub: "I do my best stuff alone or I'm usually on my own",
     confirm: "Some of the best moves are better alone anyway.",
   },
   {
     key: "small_group",
-    icon: "👫",
-    label: "Small group",
-    sub: "My person or a close friend or two",
+    icon: "👋",
+    label: "Small circle",
+    sub: "One or two people I actually like",
     confirm: "We'll find moves worth sharing.",
   },
   {
     key: "big_group",
-    icon: "👥",
-    label: "The more the merrier",
-    sub: "I want the whole crew there",
+    icon: "🎉",
+    label: "Big energy",
+    sub: "The more people the better",
     confirm: "We'll find moves worth texting the whole group about.",
   },
   {
     key: "depends",
-    icon: "🔀",
-    label: "Depends on the night",
+    icon: "🌊",
+    label: "Depends on the vibe",
     sub: "",
     confirm: "We'll read the room.",
   },
@@ -1935,13 +1933,17 @@ function SetupScreen({
   shellStep: number;
   userNeighborhood: string;
   userInterests: string[];
-  userBudget: number;
+  userBudget: BudgetOption | null;
   userSocialStyle: SocialStyle;
   onDone: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const subhead = setupSubhead(userSocialStyle);
-  const budgetLabel = userBudget >= 150 ? "$100+" : `$${userBudget}`;
+  const budgetLabel =
+    userBudget === "free" ? "$0–$15"
+    : userBudget === "cheap" ? "$15–$30"
+    : userBudget === "splurge" ? "$30+"
+    : "varies";
 
   const checklistItems = [
     `${userNeighborhood} locked in`,
@@ -2243,7 +2245,7 @@ export default function OnboardingScreen() {
   const [userArea, setUserArea] = useState<Area | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [userInterests, setUserInterests] = useState<string[]>([]);
-  const [userBudget, setUserBudget] = useState(30);
+  const [userBudget, setUserBudget] = useState<BudgetOption | null>(null);
   const [userSocialStyle, setUserSocialStyle] = useState<SocialStyle>(null);
 
   function toggleInterest(key: string) {
@@ -2285,7 +2287,7 @@ export default function OnboardingScreen() {
       : "45+";
 
     const budgetPref: UserPreferences["budget"] =
-      userBudget <= 15 ? "free" : userBudget <= 60 ? "cheap" : "flexible";
+      userBudget === "free" ? "free" : userBudget === "cheap" ? "cheap" : "flexible";
 
     const socialBatteryPref: UserPreferences["socialBattery"] =
       userSocialStyle === "solo" ? "introvert"
@@ -2305,7 +2307,7 @@ export default function OnboardingScreen() {
       AsyncStorage.setItem("userArea", userArea ?? ""),
       AsyncStorage.setItem("userLocation", JSON.stringify(userLocation)),
       AsyncStorage.setItem("userInterests", JSON.stringify(userInterests)),
-      AsyncStorage.setItem("userBudget", String(userBudget)),
+      AsyncStorage.setItem("userBudget", userBudget ?? ""),
       AsyncStorage.setItem("userSocialStyle", userSocialStyle ?? ""),
     ]);
 
@@ -2454,7 +2456,7 @@ export default function OnboardingScreen() {
     <BudgetScreen
       shellStep={ss}
       value={userBudget}
-      onChange={setUserBudget}
+      onSelect={setUserBudget}
       onContinue={goNext}
       onBack={goBack}
     />
