@@ -655,35 +655,45 @@ function CustomSlider({
   max: number;
   onChange: (v: number) => void;
 }) {
-  const [trackWidth, setTrackWidth] = useState(W - 48);
-  const pct = (value - min) / (max - min);
+  const trackRef = useRef<View>(null);
+  const trackWidthRef = useRef(W - 48);
+  const trackPageXRef = useRef(0);
+  // Keep onChange in a ref so the stable PanResponder always calls the latest version
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        const x = e.nativeEvent.locationX;
-        const ratio = Math.max(0, Math.min(1, x / trackWidth));
-        onChange(Math.round(min + ratio * (max - min)));
+      onPanResponderGrant: (_e, gs) => {
+        const x = gs.x0 - trackPageXRef.current;
+        const ratio = Math.max(0, Math.min(1, x / trackWidthRef.current));
+        onChangeRef.current(Math.round(min + ratio * (max - min)));
       },
-      onPanResponderMove: (e) => {
-        const x = e.nativeEvent.locationX;
-        const ratio = Math.max(0, Math.min(1, x / trackWidth));
-        onChange(Math.round(min + ratio * (max - min)));
+      onPanResponderMove: (_e, gs) => {
+        const x = gs.moveX - trackPageXRef.current;
+        const ratio = Math.max(0, Math.min(1, x / trackWidthRef.current));
+        onChangeRef.current(Math.round(min + ratio * (max - min)));
       },
     })
   ).current;
 
+  const pct = (value - min) / (max - min);
+
   return (
     <View
+      ref={trackRef}
       style={sl.track}
-      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+      onLayout={() => {
+        trackRef.current?.measure((_x, _y, w, _h, pageX) => {
+          trackWidthRef.current = w;
+          trackPageXRef.current = pageX;
+        });
+      }}
       {...panResponder.panHandlers}
     >
-      {/* Filled portion */}
       <View style={[sl.fill, { width: `${pct * 100}%` }]} />
-      {/* Thumb */}
       <View style={[sl.thumb, { left: `${pct * 100}%` }]} />
     </View>
   );
@@ -1157,15 +1167,17 @@ function AgeScreen({
 const ag = StyleSheet.create({
   ageWrap: {
     alignItems: "center",
-    marginTop: 32,
-    marginBottom: 8,
+    justifyContent: "center",
+    marginTop: 40,
+    marginBottom: 32,
   },
   ageNum: {
-    fontSize: 88,
+    fontSize: 96,
     fontWeight: "800",
     color: WHITE,
-    letterSpacing: -4,
-    lineHeight: 96,
+    letterSpacing: -5,
+    lineHeight: 104,
+    textAlign: "center",
   },
   rangeRow: {
     flexDirection: "row",
