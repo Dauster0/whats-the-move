@@ -1,6 +1,7 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { rateLimit } from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
@@ -69,6 +70,22 @@ process.on("unhandledRejection", (reason, promise) => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+/** Per-IP rate limits — protect OpenAI + Google quota during beta. */
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down and try again in a minute." },
+});
+const detailLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — try again in a minute." },
+});
 
 /** Bumped when photo sourcing changes — check Railway after deploy (must match this repo). */
 const PHOTO_PIPELINE = "google-places-hero-v1";
@@ -2435,7 +2452,7 @@ app.post("/generate-moves", async (req, res) => {
 });
 
 /** GPT-4o orchestration: Ticketmaster + Places + weather → ranked cards + Unsplash heroes */
-app.post("/concierge-recommendations", async (req, res) => {
+app.post("/concierge-recommendations", aiLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeRecommendations(req.body || {});
@@ -2450,7 +2467,7 @@ app.post("/concierge-recommendations", async (req, res) => {
   }
 });
 
-app.post("/concierge-ahead", async (req, res) => {
+app.post("/concierge-ahead", aiLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeAheadRecommendations(req.body || {});
@@ -2465,7 +2482,7 @@ app.post("/concierge-ahead", async (req, res) => {
   }
 });
 
-app.post("/concierge-detail", async (req, res) => {
+app.post("/concierge-detail", detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetail(req.body || {});
@@ -2479,7 +2496,7 @@ app.post("/concierge-detail", async (req, res) => {
   }
 });
 
-app.post("/concierge-detail/quick", async (req, res) => {
+app.post("/concierge-detail/quick", detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetailQuick(req.body || {});
@@ -2493,7 +2510,7 @@ app.post("/concierge-detail/quick", async (req, res) => {
   }
 });
 
-app.post("/concierge-detail/narrative", async (req, res) => {
+app.post("/concierge-detail/narrative", detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetailNarrative(req.body || {});
@@ -2507,7 +2524,7 @@ app.post("/concierge-detail/narrative", async (req, res) => {
   }
 });
 
-app.post("/concierge-chat", async (req, res) => {
+app.post("/concierge-chat", detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const { suggestion = {}, detail = {}, messages = [], userMessage = "" } = req.body || {};

@@ -221,6 +221,9 @@ export default function HomeScreen() {
   const [sharperPicksBannerVisible, setSharperPicksBannerVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [postMoveCheckIn, setPostMoveCheckIn] = useState<{ title: string; category: string } | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const swipeHintShownRef = useRef(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -233,6 +236,12 @@ export default function HomeScreen() {
     return () => setPeekDetailHandlers(null);
   }, []);
 
+  useEffect(() => {
+    if (!showSwipeHint) return;
+    const t = setTimeout(() => setShowSwipeHint(false), 2500);
+    return () => clearTimeout(t);
+  }, [showSwipeHint]);
+
   const fetchDeckList = useCallback(async (): Promise<ConciergeSuggestion[]> => {
     const prefs = preferencesRef.current;
     const ints = prefs.interests ?? [];
@@ -241,6 +250,7 @@ export default function HomeScreen() {
       throw new Error("Pick at least one interest (⋯ menu → Interests) so we can suggest moves.");
     }
     const loc = await getReadableLocation();
+    setLocationDenied(loc.lat === null);
     const place = loc.place || "near you";
     const recentSuggestions = await getRecentConciergeTitles();
     const nowIso = new Date().toISOString();
@@ -329,6 +339,10 @@ export default function HomeScreen() {
         setSuggestions(list);
         registerDeckKeys(list);
         setDeckRefreshSoft(false);
+        if (list.length > 0 && !swipeHintShownRef.current) {
+          swipeHintShownRef.current = true;
+          setShowSwipeHint(true);
+        }
 
         if (!isPlusRef.current && (mode === "full" || mode === "refresh" || mode === "background")) {
           const { justUsedThird } = await consumeDeckRefreshCredit();
@@ -481,6 +495,7 @@ export default function HomeScreen() {
   }, []);
 
   const quickCommitSwipeRight = useCallback(() => {
+    setShowSwipeHint(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const prev = suggestionsRef.current;
     const s = prev[0];
@@ -576,6 +591,7 @@ export default function HomeScreen() {
   }, [applyNextDeckOrEmpty, openPlusPaywall]);
 
   const commitSwipeLeft = useCallback(() => {
+    setShowSwipeHint(false);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     let skippedCategory = "experience";
     setSuggestions((prev) => {
@@ -1041,6 +1057,17 @@ export default function HomeScreen() {
         ) : null}
       </View> : null}
 
+      {locationDenied ? (
+        <Pressable
+          style={styles.locationBanner}
+          onPress={() => Linking.openSettings()}
+        >
+          <Text style={styles.locationBannerText}>
+            📍 Enable location for better picks — tap to open Settings
+          </Text>
+        </Pressable>
+      ) : null}
+
       {loading && suggestions.length === 0 ? (
         <View style={styles.loadingBlock}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -1118,6 +1145,11 @@ export default function HomeScreen() {
                 />
               )}
             />
+            {showSwipeHint ? (
+              <View pointerEvents="none" style={styles.swipeHint}>
+                <Text style={styles.swipeHintText}>← swipe to skip · swipe to go →</Text>
+              </View>
+            ) : null}
             <DeckButtons
               onNah={commitSwipeLeft}
               onGo={quickCommitSwipeRight}
@@ -1517,13 +1549,22 @@ function createStyles(
       color: colors.accent,
     },
     swipeHint: {
+      position: "absolute" as const,
+      bottom: 8,
+      left: 0,
+      right: 0,
+      alignItems: "center" as const,
+      zIndex: 20,
+    },
+    swipeHintText: {
       fontSize: 12,
       fontWeight: "600",
       color: colors.textMuted,
-      paddingHorizontal: spacing.md,
-      marginTop: spacing.sm,
-      marginBottom: spacing.md,
-      minHeight: 40,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: radius.full,
+      overflow: "hidden" as const,
     },
     cardsScrollContent: {
       alignItems: "stretch",
@@ -1763,6 +1804,20 @@ function createStyles(
     checkInOptionText: {
       fontSize: 12,
       fontWeight: "700",
+    },
+    locationBanner: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+      backgroundColor: "rgba(255,255,255,0.07)",
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+    },
+    locationBannerText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+      textAlign: "center",
     },
   });
 }
