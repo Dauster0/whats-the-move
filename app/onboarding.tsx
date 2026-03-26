@@ -214,15 +214,36 @@ function Splash({ onContinue }: { onContinue: () => void }) {
 
         {/* 2 — Move cards in the middle */}
         <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
-        <View style={sp.previewOuter}>
-          <View style={sp.miniCard}>
-            <Text style={sp.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
+        <View style={sp.stack}>
+          <View style={sp.card}>
+            <View style={[sp.imageZone, { backgroundColor: "#0d1526" }]}>
+              <Text style={sp.emoji}>🎵</Text>
+              <Text style={sp.category}>LIVE MUSIC</Text>
+            </View>
+            <View style={sp.cardBody}>
+              <Text style={sp.cardTitle}>Clairo at The Wiltern</Text>
+              <View style={sp.tagRow}><Text style={sp.tag}>Tonight</Text><Text style={sp.tag}>9 PM</Text></View>
+            </View>
           </View>
-          <View style={sp.miniCard}>
-            <Text style={sp.miniText}>🌮  Best birria in Koreatown — open now</Text>
+          <View style={sp.card}>
+            <View style={[sp.imageZone, { backgroundColor: "#3d2918" }]}>
+              <Text style={sp.emoji}>🌮</Text>
+              <Text style={sp.category}>FOOD & DRINK</Text>
+            </View>
+            <View style={sp.cardBody}>
+              <Text style={sp.cardTitle}>Best birria in Koreatown</Text>
+              <View style={sp.tagRow}><Text style={sp.tag}>Open now</Text></View>
+            </View>
           </View>
-          <View style={sp.miniCard}>
-            <Text style={sp.miniText}>🔭  Meteor shower at Griffith — 11PM</Text>
+          <View style={sp.card}>
+            <View style={[sp.imageZone, { backgroundColor: "#14261c" }]}>
+              <Text style={sp.emoji}>🔭</Text>
+              <Text style={sp.category}>OUTDOOR</Text>
+            </View>
+            <View style={sp.cardBody}>
+              <Text style={sp.cardTitle}>Meteor shower at Griffith</Text>
+              <View style={sp.tagRow}><Text style={sp.tag}>11 PM</Text><Text style={sp.tag}>Tonight</Text></View>
+            </View>
           </View>
         </View>
       </View>
@@ -254,25 +275,58 @@ const sp = StyleSheet.create({
     letterSpacing: 1.4,
     marginBottom: 10,
   },
-  previewOuter: {
-    backgroundColor: "#1C1C1E",
-    borderRadius: 20,
-    padding: 14,
+  stack: {
     gap: 10,
   },
-  miniCard: {
-    backgroundColor: "#111111",
-    borderRadius: 12,
-    paddingVertical: 15,
-    paddingHorizontal: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: PEACH,
+  card: {
+    backgroundColor: "#161412",
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  miniText: {
-    fontSize: 15,
-    fontWeight: "700",
+  imageZone: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  emoji: {
+    fontSize: 20,
+  },
+  category: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  cardBody: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
     color: WHITE,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  tagRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  tag: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    overflow: "hidden",
   },
   eyebrow: {
     fontSize: 10,
@@ -420,16 +474,48 @@ function PersonalizedResponse({
       <Text style={sc.headline}>{headline}</Text>
       <Text style={sc.body}>{body}</Text>
 
-      {/* App preview card */}
-      <View style={pr.previewOuter}>
-        <View style={[pr.miniCard, { borderLeftColor: "#A78BFA" }]}>
-          <Text style={pr.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
+      {/* App preview — mini move cards */}
+      <View style={pr.stack}>
+        {/* Concert */}
+        <View style={pr.card}>
+          <View style={[pr.imageZone, { backgroundColor: "#0d1526" }]}>
+            <Text style={pr.emoji}>🎵</Text>
+            <Text style={pr.category}>LIVE MUSIC</Text>
+          </View>
+          <View style={pr.body}>
+            <Text style={pr.title}>Clairo at The Wiltern</Text>
+            <View style={pr.tagRow}>
+              <Text style={pr.tag}>Tonight</Text>
+              <Text style={pr.tag}>9 PM</Text>
+            </View>
+          </View>
         </View>
-        <View style={[pr.miniCard, { borderLeftColor: "#F97316" }]}>
-          <Text style={pr.miniText}>🌮  Best birria in Koreatown — open now</Text>
+        {/* Food */}
+        <View style={pr.card}>
+          <View style={[pr.imageZone, { backgroundColor: "#3d2918" }]}>
+            <Text style={pr.emoji}>🌮</Text>
+            <Text style={pr.category}>FOOD & DRINK</Text>
+          </View>
+          <View style={pr.body}>
+            <Text style={pr.title}>Best birria in Koreatown</Text>
+            <View style={pr.tagRow}>
+              <Text style={pr.tag}>Open now</Text>
+            </View>
+          </View>
         </View>
-        <View style={[pr.miniCard, { borderLeftColor: "#34D399" }]}>
-          <Text style={pr.miniText}>🔭  Meteor shower at Griffith — 11PM</Text>
+        {/* Outdoor */}
+        <View style={pr.card}>
+          <View style={[pr.imageZone, { backgroundColor: "#14261c" }]}>
+            <Text style={pr.emoji}>🔭</Text>
+            <Text style={pr.category}>OUTDOOR</Text>
+          </View>
+          <View style={pr.body}>
+            <Text style={pr.title}>Meteor shower at Griffith</Text>
+            <View style={pr.tagRow}>
+              <Text style={pr.tag}>11 PM</Text>
+              <Text style={pr.tag}>Tonight</Text>
+            </View>
+          </View>
         </View>
       </View>
     </Shell>
@@ -437,25 +523,59 @@ function PersonalizedResponse({
 }
 
 const pr = StyleSheet.create({
-  previewOuter: {
-    marginTop: 32,
-    backgroundColor: CARD,
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
+  stack: {
+    marginTop: 28,
+    gap: 10,
   },
-  miniCard: {
-    backgroundColor: "#111111",
-    borderRadius: 12,
-    paddingVertical: 16,
+  card: {
+    backgroundColor: "#161412",
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  imageZone: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
-    borderLeftWidth: 3,
+    gap: 10,
   },
-  miniText: {
-    fontSize: 14,
-    fontWeight: "600",
+  emoji: {
+    fontSize: 22,
+  },
+  category: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  body: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: "800",
     color: WHITE,
     letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  tagRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  tag: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    overflow: "hidden",
   },
 });
 
