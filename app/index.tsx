@@ -56,6 +56,8 @@ import {
   dismissPaywall,
   dismissThirdRefreshUpsell,
   expireTrialIfNeeded,
+  isDevPlusUnlocked,
+  isPlusEffectiveOrDev,
   isThirdRefreshUpsellDismissedToday,
   isWildcardLocked,
   loadEntitlements,
@@ -164,11 +166,11 @@ export default function HomeScreen() {
   /** Deck fits between filters and ✕/✓ on iPhone 14-class screens (conservative reserve). */
   const DECK_HEIGHT = useMemo(() => {
     /** Filters + tabs + swipe hint + breathing room so cards don’t cover the hint. */
-    const reservedAboveDeck = 432;
+    const reservedAboveDeck = 260;
     const deckButtonsAndGap = 80;
     const raw =
       SCREEN_H - insets.top - insets.bottom - reservedAboveDeck - deckButtonsAndGap;
-    return Math.max(300, Math.min(458, raw));
+    return Math.max(420, Math.min(580, raw));
   }, [insets.top, insets.bottom]);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
   const { isPlus, loaded: plusLoaded, refresh: refreshPlus } = usePlusEntitlements();
@@ -360,7 +362,7 @@ export default function HomeScreen() {
       void (async () => {
         const ended = await expireTrialIfNeeded();
         if (ended) await refreshPlus();
-        if (ended && !trialPaywallShownRef.current) {
+        if (ended && !trialPaywallShownRef.current && !isDevPlusUnlocked()) {
           trialPaywallShownRef.current = true;
           router.push("/elsewhere-plus?source=trial_ended" as Href);
         }
@@ -368,6 +370,7 @@ export default function HomeScreen() {
         await refreshPlus();
         if (
           !isFirstHomeFocus &&
+          !isPlusEffectiveOrDev(ent) &&
           ent.sessionOpenCount >= 5 &&
           !ent.fiveSessionUpsellShown &&
           (await canShowPaywallAfterDismiss())

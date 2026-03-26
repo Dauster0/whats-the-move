@@ -8,6 +8,7 @@ import * as Linking from "expo-linking";
 import {
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -113,7 +114,7 @@ export function ConciergeHeroCard({
   const innerW = width - pad * 2;
   const imageZoneH =
     swipeMode && deckMaxHeight != null && deckMaxHeight > 0
-      ? Math.max(112, Math.round(deckMaxHeight * 0.45))
+      ? Math.max(112, Math.round(deckMaxHeight * 0.38))
       : Math.max(168, Math.round(innerW * IMAGE_ZONE_RATIO));
   const fallbackBg = categoryFallbackBackground(s.category);
   const poster = s.imageLayout === "poster";
@@ -136,6 +137,8 @@ export function ConciergeHeroCard({
   const showShimmer = Boolean(s.photoUrl) && !imgLoaded && !imgError;
 
   const displayDescription = swipeMode ? truncateToTwoSentences(s.description) : s.description;
+
+  const deckFit = Boolean(swipeMode && deckMaxHeight != null && deckMaxHeight > 0);
 
   const imageBlock = (
     <View style={[styles.imageZone, { height: imageZoneH, backgroundColor: fallbackBg }]}>
@@ -162,6 +165,7 @@ export function ConciergeHeroCard({
             source={{ uri: s.photoUrl! }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
+            contentPosition="top"
             cachePolicy="memory-disk"
             recyclingKey={s.photoUrl ?? undefined}
             onLoad={() => setImgLoaded(true)}
@@ -357,19 +361,25 @@ export function ConciergeHeroCard({
     </View>
   );
 
+  const cardPressProps = {
+    disabled: !onCardPress && !wildcardLocked,
+    onPress: wildcardLocked ? onLockedWildcardPress : onCardPress,
+  } as const;
+
   return (
     <View style={{ width, paddingHorizontal: pad, marginBottom: swipeMode ? 0 : spacing.sm }}>
       <View
         style={[
           styles.frame,
           swipeMode && styles.frameSwipe,
+          deckFit ? { height: deckMaxHeight, maxHeight: deckMaxHeight } : null,
           {
             borderColor: swipeMode ? "rgba(255,255,255,0.1)" : colors.border,
             backgroundColor: colors.bgCard,
           },
         ]}
       >
-        <View style={styles.column}>
+        <View style={[styles.column, deckFit && styles.columnDeckFit]}>
           {onBookmarkPress && !wildcardLocked ? (
             <Pressable
               style={[styles.bookmarkHit, { backgroundColor: "rgba(0,0,0,0.45)" }]}
@@ -386,19 +396,48 @@ export function ConciergeHeroCard({
               />
             </Pressable>
           ) : null}
-          <>
-            <Pressable
-              disabled={!onCardPress && !wildcardLocked}
-              onPress={wildcardLocked ? onLockedWildcardPress : onCardPress}
-              style={({ pressed }) => [
-                pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
-              ]}
-            >
-              {imageBlock}
-              <View style={[styles.textBody, swipeMode && styles.textBodySwipe]}>{textBodyInner}</View>
-            </Pressable>
-            {footerBlock}
-          </>
+          {deckFit ? (
+            <View style={styles.swipeDeckBody}>
+              <Pressable
+                {...cardPressProps}
+                style={({ pressed }) => [
+                  pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                ]}
+              >
+                {imageBlock}
+              </Pressable>
+              <ScrollView
+                style={styles.swipeTextScroll}
+                contentContainerStyle={styles.swipeTextScrollContent}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Pressable
+                  {...cardPressProps}
+                  style={({ pressed }) => [
+                    pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                  ]}
+                >
+                  <View style={[styles.textBody, styles.textBodySwipe]}>{textBodyInner}</View>
+                </Pressable>
+                {footerBlock}
+              </ScrollView>
+            </View>
+          ) : (
+            <>
+              <Pressable
+                {...cardPressProps}
+                style={({ pressed }) => [
+                  pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                ]}
+              >
+                {imageBlock}
+                <View style={[styles.textBody, swipeMode && styles.textBodySwipe]}>{textBodyInner}</View>
+              </Pressable>
+              {footerBlock}
+            </>
+          )}
         </View>
       </View>
     </View>
@@ -430,6 +469,23 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     width: "100%",
     flexShrink: 0,
+  },
+  columnDeckFit: {
+    flex: 1,
+    minHeight: 0,
+  },
+  swipeDeckBody: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: "column",
+  },
+  swipeTextScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  swipeTextScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xs,
   },
   imageZone: {
     width: "100%",

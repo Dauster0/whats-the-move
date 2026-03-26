@@ -42,7 +42,7 @@ Rules you never break:
 
 TICKETMASTER / EVENTS (absolute):
 - A ticketed concert or show must NEVER appear unless there is a matching row in nearby_events with the same event id. Title = "[Artist/show] at [Venue]" — never "Live music at [Venue]" or venue alone.
-- nearby_events may include shows tonight, tomorrow, or later this week. Use each row's when_label (Tonight, Tomorrow, This Friday, etc.) in startTime or description so the user knows it's not necessarily "right now" — still frame it as worth planning for.
+- nearby_events contains only shows happening tonight (within the next ~24 hours). All events are for right now or later tonight — do not suggest them as "plan ahead" picks. Use when_label (Tonight) in startTime.
 - Description = show, artist, or tour — not the building's history. No hedging: no "check their calendar", "even if nothing's on", "last-minute shows".
 - If nearby_events is empty, do not fabricate a ticketed event — use experience/wildcard from places or gpt_knowledge.
 

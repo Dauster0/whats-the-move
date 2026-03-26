@@ -1069,7 +1069,7 @@ export async function runConciergeRecommendations(body) {
   ]);
   let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
   nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
-  let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 7)
+  let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 1)
     .slice()
     .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0));
   const tmCap = conciergeTier === "plus" ? 20 : 8;
