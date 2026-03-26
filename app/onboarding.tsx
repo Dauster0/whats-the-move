@@ -199,22 +199,26 @@ const sh = StyleSheet.create({
 function Splash({ onContinue }: { onContinue: () => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[sp.root]}>
+    <View style={sp.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* Hero placeholder — top 60% */}
-      <View style={sp.hero}>
-        {/* gradient layers */}
-        <View style={sp.heroDark} />
-        <View style={sp.heroMid} />
-        <View style={[sp.heroContent, { paddingTop: insets.top + 20 }]}>
-          <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
+      {/* Upper area — app preview */}
+      <View style={[sp.upper, { paddingTop: insets.top + 24 }]}>
+        <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
+        <View style={sp.previewOuter}>
+          <View style={[sp.miniCard, { borderLeftColor: "#A78BFA" }]}>
+            <Text style={sp.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
+          </View>
+          <View style={[sp.miniCard, { borderLeftColor: "#F97316" }]}>
+            <Text style={sp.miniText}>🌮  Best birria in Koreatown — open now</Text>
+          </View>
+          <View style={[sp.miniCard, { borderLeftColor: "#34D399" }]}>
+            <Text style={sp.miniText}>🔭  Meteor shower at Griffith — 11PM</Text>
+          </View>
         </View>
-        {/* bottom fade */}
-        <View style={sp.heroFade} />
       </View>
 
-      {/* Bottom card */}
+      {/* Bottom content */}
       <View style={[sp.card, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
         <Text style={sp.headline}>
           {"Something good\nis happening\nnear you tonight."}
@@ -237,33 +241,29 @@ const sp = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
-  hero: {
-    height: H * 0.56,
-    backgroundColor: "#1A1A1A",
-    overflow: "hidden",
-  },
-  heroDark: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0D0D0D",
-  },
-  heroMid: {
-    ...StyleSheet.absoluteFillObject,
-    top: "30%",
-    backgroundColor: "#1C1410",
-    opacity: 0.6,
-  },
-  heroFade: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    backgroundColor: BG,
-    opacity: 0.9,
-  },
-  heroContent: {
+  upper: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  previewOuter: {
+    marginTop: 24,
+    backgroundColor: "#1C1C1E",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  miniCard: {
+    backgroundColor: "#111111",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderLeftWidth: 3,
+  },
+  miniText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: WHITE,
+    letterSpacing: -0.2,
   },
   eyebrow: {
     fontSize: 10,
