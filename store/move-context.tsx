@@ -27,15 +27,15 @@ export type UserPreferences = {
   preferredTimes: ("morning" | "midday" | "afternoon" | "evening" | "night")[];
   /** Neighborhood or city — used in AI copy & booking search context */
   homeCity: string;
-  /** School, campus, or work area — optional anchor for “near campus” style ideas */
+  /** School, campus, or work area — optional anchor for "near campus" style ideas */
   schoolOrWork: string;
   ageRange: "under18" | "18-21" | "18-24" | "25-34" | "35-44" | "45+" | "prefer_not";
-  /** Separate from socialMode: introverts get fewer “ping a friend” nudges */
-  socialBattery: “introvert” | “ambivert” | “extrovert”;
-  /** Food tilt for concierge deck (same idea as old “Hungry?” full finder). */
+  /** Separate from socialMode: introverts get fewer "ping a friend" nudges */
+  socialBattery: "introvert" | "ambivert" | "extrovert";
+  /** Food tilt for concierge deck (same idea as old "Hungry?" full finder). */
   hungerPreference: HungerPreference;
   /** How the user gets around — affects distance bias in suggestions. */
-  transportMode: “walking” | “cycling” | “transit” | “driving”;
+  transportMode: "walking" | "cycling" | "transit" | "driving";
 };
 
 type MoveContextType = {

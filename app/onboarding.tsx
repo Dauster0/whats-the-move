@@ -39,6 +39,7 @@ export default function OnboardingScreen() {
     ageRange: "prefer_not",
     socialBattery: "ambivert",
     hungerPreference: "any",
+    transportMode: "driving",
   });
 
   function toggleInterest(value: string) {
