@@ -2578,7 +2578,7 @@ Answer the user's questions about this specific move. Be direct and factual. If 
       .slice(-10)
       .map((m) => ({ role: m.role, content: String(m.content) }));
 
-    const completion = await openai.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 300,
       messages: [
