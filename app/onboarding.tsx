@@ -1698,6 +1698,448 @@ const sb = StyleSheet.create({
   },
 });
 
+// ─── Screen 16 — Notifications ───────────────────────────────────────────────
+
+function NotificationsScreen({
+  shellStep,
+  onContinue,
+  onBack,
+}: {
+  shellStep: number;
+  onContinue: () => void;
+  onBack: () => void;
+}) {
+  const [chosen, setChosen] = useState(false);
+
+  async function requestNotifications() {
+    try {
+      const { default: Notifications } = await import("expo-notifications");
+      await Notifications.requestPermissionsAsync();
+    } catch {}
+    setChosen(true);
+    onContinue();
+  }
+
+  function skip() {
+    setChosen(true);
+    onContinue();
+  }
+
+  return (
+    <Shell
+      step={shellStep}
+      canContinue={chosen}
+      continueLabel="Continue →"
+      onContinue={onContinue}
+      onBack={onBack}
+    >
+      {/* Notification mockup card */}
+      <View style={no.mockCard}>
+        <View style={no.mockIcon}>
+          <Text style={no.mockIconText}>📍</Text>
+        </View>
+        <View style={no.mockBody}>
+          <Text style={no.mockApp}>What's the Move</Text>
+          <Text style={no.mockMsg}>
+            There's a meteor shower visible from Griffith tonight at 11pm. Go.
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[sc.headline, { marginTop: 28 }]}>
+        {"Don't miss the\ngood stuff."}
+      </Text>
+      <Text style={sc.body}>
+        Some moves only last one night. We'll tap you when something rare is
+        happening near you.
+      </Text>
+
+      <View style={no.buttons}>
+        <Pressable style={no.notifyBtn} onPress={requestNotifications} activeOpacity={0.8}>
+          <Text style={no.notifyBtnText}>🔔  Notify me about rare moves</Text>
+        </Pressable>
+        <Pressable onPress={skip} style={no.skipBtn} hitSlop={12} activeOpacity={0.7}>
+          <Text style={no.skipBtnText}>Not right now</Text>
+        </Pressable>
+      </View>
+    </Shell>
+  );
+}
+
+const no = StyleSheet.create({
+  mockCard: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  mockIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: "#2A2015",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mockIconText: { fontSize: 22 },
+  mockBody: { flex: 1 },
+  mockApp: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: MUTED_LIGHT,
+    marginBottom: 4,
+    letterSpacing: 0.2,
+  },
+  mockMsg: {
+    fontSize: 14,
+    color: WHITE,
+    lineHeight: 20,
+  },
+  buttons: {
+    gap: 14,
+    marginTop: 36,
+  },
+  notifyBtn: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: PEACH,
+  },
+  notifyBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: PEACH,
+  },
+  skipBtn: {
+    alignSelf: "center",
+    paddingVertical: 8,
+  },
+  skipBtnText: {
+    fontSize: 14,
+    color: MUTED,
+    fontWeight: "500",
+  },
+});
+
+// ─── Screen 17 — Setup ────────────────────────────────────────────────────────
+
+function setupSubhead(style: SocialStyle): string {
+  if (style === "solo") return "Building moves you can do on your own terms.";
+  if (style === "small_group") return "Building moves for you and your people.";
+  if (style === "big_group") return "Building moves worth texting the whole group about.";
+  return "Building moves for whatever tonight turns out to be.";
+}
+
+const CHECKLIST_DELAY = 700; // ms between each item appearing
+
+function SetupScreen({
+  shellStep,
+  userNeighborhood,
+  userInterests,
+  userBudget,
+  userSocialStyle,
+  onDone,
+}: {
+  shellStep: number;
+  userNeighborhood: string;
+  userInterests: string[];
+  userBudget: number;
+  userSocialStyle: SocialStyle;
+  onDone: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const subhead = setupSubhead(userSocialStyle);
+  const budgetLabel = userBudget >= 150 ? "$100+" : `$${userBudget}`;
+
+  const checklistItems = [
+    `${userNeighborhood} locked in`,
+    `${userInterests.length} interest${userInterests.length !== 1 ? "s" : ""} saved`,
+    `Budget set — up to ${budgetLabel}`,
+    "Pulling what's open near you...",
+    "Building your first deck...",
+  ];
+
+  // Visibility state per item (0 = hidden, 1 = visible)
+  const [visible, setVisible] = useState<boolean[]>(checklistItems.map(() => false));
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value((shellStep - 1) / TOTAL_STEPS)).current;
+
+  useEffect(() => {
+    // Reveal items one by one
+    checklistItems.forEach((_, i) => {
+      setTimeout(() => {
+        setVisible((prev) => {
+          const next = [...prev];
+          next[i] = true;
+          return next;
+        });
+      }, i * CHECKLIST_DELAY + 300);
+    });
+
+    // After all items shown, pulse the last one
+    const pulseStart = checklistItems.length * CHECKLIST_DELAY + 300;
+    setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    }, pulseStart);
+
+    // Fill progress bar to 100%
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: checklistItems.length * CHECKLIST_DELAY + 800,
+      useNativeDriver: false,
+    }).start();
+
+    // Auto-advance after 4 seconds
+    const timer = setTimeout(onDone, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <View style={[se.root, { backgroundColor: BG }]}>
+      {/* Progress bar (manual since no Shell) */}
+      <View style={[se.progressArea, { paddingTop: insets.top + 12 }]}>
+        <View style={se.progressTrack}>
+          <Animated.View
+            style={[
+              se.progressFill,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0%", "100%"],
+                }),
+              },
+            ]}
+          />
+        </View>
+        <Text style={se.stepLabel}>Step {shellStep} of {TOTAL_STEPS}</Text>
+      </View>
+
+      <View style={se.content}>
+        <Text style={se.headline}>Almost there.</Text>
+        <Text style={se.subhead}>{subhead}</Text>
+
+        <View style={se.checklist}>
+          {checklistItems.map((item, i) => {
+            const isLast = i === checklistItems.length - 1;
+            const isVisible = visible[i];
+
+            return (
+              <Animated.View
+                key={i}
+                style={[
+                  se.checkRow,
+                  { opacity: isVisible ? (isLast ? pulseAnim : 1) : 0 },
+                ]}
+              >
+                {isLast ? (
+                  <Animated.Text style={[se.checkIcon, se.checkIconSpin, { opacity: pulseAnim }]}>
+                    ⟳
+                  </Animated.Text>
+                ) : (
+                  <Text style={se.checkIcon}>✓</Text>
+                )}
+                <Text style={[se.checkText, isLast && se.checkTextLast]}>
+                  {item}
+                </Text>
+              </Animated.View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const se = StyleSheet.create({
+  root: { flex: 1 },
+  progressArea: {
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: "#2A2A2A",
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: PEACH,
+    borderRadius: 2,
+  },
+  stepLabel: {
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: "500",
+    letterSpacing: 0.3,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    justifyContent: "center",
+  },
+  headline: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: WHITE,
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  subhead: {
+    fontSize: 15,
+    color: MUTED_LIGHT,
+    lineHeight: 22,
+    marginBottom: 48,
+  },
+  checklist: {
+    gap: 20,
+  },
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  checkIcon: {
+    fontSize: 18,
+    color: PEACH,
+    width: 24,
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  checkIconSpin: {
+    color: PEACH,
+  },
+  checkText: {
+    fontSize: 16,
+    color: WHITE,
+    fontWeight: "500",
+  },
+  checkTextLast: {
+    color: PEACH,
+  },
+});
+
+// ─── Screen 18 — Payoff ───────────────────────────────────────────────────────
+
+function Payoff({
+  userNeighborhood,
+  userInterests,
+  onFinish,
+}: {
+  userNeighborhood: string;
+  userInterests: string[];
+  onFinish: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[py.root]}>
+      {/* Hero image — top 70% */}
+      <View style={py.hero}>
+        <View style={py.heroBg} />
+        {/* Gradient overlay on bottom half */}
+        <View style={py.heroGradient} />
+        {/* Text over gradient */}
+        <View style={py.heroText}>
+          <Text style={py.headline}>
+            {`${userNeighborhood} is\nwaiting for you.`}
+          </Text>
+          <Text style={py.sub}>
+            {`${userInterests.length} interest${userInterests.length !== 1 ? "s" : ""}. Your city. Right now.`}
+          </Text>
+        </View>
+      </View>
+
+      {/* Bottom action */}
+      <View style={[py.bottom, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
+        <Pressable style={py.btn} onPress={onFinish} activeOpacity={0.85}>
+          <Text style={py.btnText}>What's the move? →</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const py = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  hero: {
+    height: "70%",
+    overflow: "hidden",
+    position: "relative",
+  },
+  heroBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#1A1410",
+  },
+  heroGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "60%",
+    backgroundColor: BG,
+    opacity: 0.85,
+  },
+  heroText: {
+    position: "absolute",
+    bottom: 32,
+    left: 24,
+    right: 24,
+  },
+  headline: {
+    fontSize: 40,
+    fontWeight: "800",
+    color: WHITE,
+    lineHeight: 46,
+    letterSpacing: -0.8,
+    marginBottom: 12,
+  },
+  sub: {
+    fontSize: 15,
+    color: MUTED_LIGHT,
+    lineHeight: 22,
+  },
+  bottom: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: "flex-end",
+  },
+  btn: {
+    backgroundColor: PEACH,
+    borderRadius: 16,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    letterSpacing: -0.2,
+  },
+});
+
 // ─── Root Onboarding Component ────────────────────────────────────────────────
 
 // Maps internal step index → Shell progress step, accounting for email skip
@@ -1777,6 +2219,7 @@ export default function OnboardingScreen() {
 
     await Promise.all([
       AsyncStorage.setItem("hasCompletedOnboarding", "true"),
+      AsyncStorage.setItem("freeNightStyle", freeNightStyle ?? ""),
       AsyncStorage.setItem("userAge", String(userAge)),
       AsyncStorage.setItem("userGender", userGender ?? ""),
       AsyncStorage.setItem("userNeighborhood", userNeighborhood),
@@ -1802,7 +2245,8 @@ export default function OnboardingScreen() {
       transportMode: "driving",
     });
 
-    router.replace("/");
+    // Advance to payoff screen — the button there does the final navigate
+    setStep(17);
   }
 
   const ss = shellStep(step, emailChosen);
@@ -1947,18 +2391,31 @@ export default function OnboardingScreen() {
     />
   );
 
-  // Placeholder for screens 16–18 (to be built)
+  if (step === 15) return (
+    <NotificationsScreen
+      shellStep={ss}
+      onContinue={goNext}
+      onBack={goBack}
+    />
+  );
+
+  if (step === 16) return (
+    <SetupScreen
+      shellStep={ss}
+      userNeighborhood={userNeighborhood}
+      userInterests={userInterests}
+      userBudget={userBudget}
+      userSocialStyle={userSocialStyle}
+      onDone={finish}
+    />
+  );
+
+  // Step 17 — Payoff (navigated to after finish() saves data)
   return (
-    <View style={{ flex: 1, backgroundColor: BG, alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ color: WHITE, fontSize: 18, fontWeight: "700" }}>
-        Screen {step + 1} — coming next
-      </Text>
-      <Pressable onPress={goNext} style={{ marginTop: 24, padding: 16 }}>
-        <Text style={{ color: PEACH }}>Next →</Text>
-      </Pressable>
-      <Pressable onPress={goBack} style={{ marginTop: 8, padding: 16 }}>
-        <Text style={{ color: MUTED }}>← Back</Text>
-      </Pressable>
-    </View>
+    <Payoff
+      userNeighborhood={userNeighborhood}
+      userInterests={userInterests}
+      onFinish={() => router.replace("/")}
+    />
   );
 }
