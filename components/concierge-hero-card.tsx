@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   frameSwipe: {
-    borderRadius: 18,
+    borderRadius: radius.xl,
   },
   column: {
     position: "relative",

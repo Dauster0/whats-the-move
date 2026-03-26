@@ -177,24 +177,19 @@ export function DeckButtons({
   return (
     <View style={styles.btnRow}>
       <Pressable
-        style={[
-          styles.circleBtn,
-          { borderColor: colors.textMuted + "55", backgroundColor: "transparent" },
-        ]}
+        style={[styles.nahBtn, { borderColor: colors.textMuted + "35" }]}
         onPress={onNah}
-        hitSlop={10}
+        hitSlop={12}
       >
-        <Text style={[styles.circleGlyph, { color: colors.text }]}>✕</Text>
+        <Text style={[styles.nahGlyph, { color: colors.textMuted }]}>✕</Text>
+        <Text style={[styles.nahLabel, { color: colors.textMuted }]}>Nah</Text>
       </Pressable>
       <Pressable
-        style={[
-          styles.circleBtn,
-          { borderColor: colors.accent + "55", backgroundColor: colors.accent + "18" },
-        ]}
+        style={[styles.goBtn, { backgroundColor: colors.accent }]}
         onPress={onGo}
-        hitSlop={10}
+        hitSlop={12}
       >
-        <Text style={[styles.circleGlyph, { color: colors.accent }]}>✓</Text>
+        <Text style={[styles.goLabel, { color: "#1C1916" }]}>I'm going</Text>
       </Pressable>
     </View>
   );
@@ -217,44 +212,68 @@ const styles = StyleSheet.create({
   },
   labelOverlay: {
     position: "absolute",
-    top: "38%",
+    top: "36%",
     zIndex: 20,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 3,
+    borderRadius: radius.full,
+    borderWidth: 2.5,
   },
   labelGo: {
-    right: spacing.md,
-    borderColor: "rgba(74, 222, 128, 0.95)",
-    backgroundColor: "rgba(22, 101, 52, 0.35)",
+    right: spacing.sm,
+    borderColor: "rgba(74, 222, 128, 0.9)",
+    backgroundColor: "rgba(22, 101, 52, 0.45)",
   },
   labelNah: {
-    left: spacing.md,
-    borderColor: "rgba(248, 113, 113, 0.95)",
-    backgroundColor: "rgba(127, 29, 29, 0.35)",
+    left: spacing.sm,
+    borderColor: "rgba(248, 113, 113, 0.9)",
+    backgroundColor: "rgba(127, 29, 29, 0.45)",
   },
   labelText: {
     fontSize: font.sizeMd,
     fontWeight: "900",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   btnRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 36,
-    marginTop: spacing.md,
+    alignItems: "center",
+    gap: 20,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
-  circleBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  nahBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+    gap: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  circleGlyph: {
-    fontSize: 20,
+  nahGlyph: {
+    fontSize: 16,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  nahLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  goBtn: {
+    flex: 1,
+    height: 58,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goLabel: {
+    fontSize: 16,
     fontWeight: "800",
+    letterSpacing: -0.2,
   },
 });

@@ -60,14 +60,12 @@ export function getColors(_isDark: boolean) {
   return colorsDark;
 }
 
-/** Mostly square corners — reads more editorial / human than pill cards */
 export const radius = {
-  sm: 2,
-  md: 3,
-  lg: 4,
-  xl: 4,
-  /** Tags and chips: slight corner, not full pill */
-  full: 6,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 22,
+  full: 999,
 };
 
 export const spacing = {
