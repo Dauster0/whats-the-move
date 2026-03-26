@@ -304,8 +304,8 @@ export default function HomeScreen() {
         mapApiConciergeSuggestion(item && typeof item === "object" ? (item as Record<string, unknown>) : {})
       )
     );
-    const dk = new Set(await getDecayExcludedKeys());
-    return filterSuggestionsByDecay(mapped, Date.now(), dk);
+    // Server already filters by decay keys — no need to re-filter client-side
+    return mapped;
   }, [energy, timeBudget, deckCategoryFocus]);
 
   const load = useCallback(
