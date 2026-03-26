@@ -1245,68 +1245,92 @@ function GenderScreen({
 
 // ─── Screen 10 — Neighborhood ─────────────────────────────────────────────────
 
-const NEIGHBORHOODS = [
-  "Koreatown", "Silver Lake", "Echo Park", "West Hollywood",
-  "Downtown LA", "Venice", "Santa Monica", "Hollywood",
-  "Los Feliz", "Culver City", "Mid-City", "Pasadena",
-  "Burbank", "Long Beach", "The Valley", "Westwood",
-  "Brentwood", "Malibu", "Inglewood", "Marina del Rey",
-];
+const AREAS = [
+  "Near campus / university",
+  "Central LA",
+  "West side (Venice, Santa Monica)",
+  "East side (Silver Lake, Echo Park)",
+  "South Bay / other",
+] as const;
+type Area = (typeof AREAS)[number];
+
+const AREA_DISPLAY: Record<Area, string> = {
+  "Near campus / university": "Your campus",
+  "Central LA": "Central LA",
+  "West side (Venice, Santa Monica)": "The West Side",
+  "East side (Silver Lake, Echo Park)": "The East Side",
+  "South Bay / other": "The South Bay",
+};
 
 function NeighborhoodScreen({
   shellStep,
-  neighborhood,
-  workArea,
-  onNeighborhood,
-  onWorkArea,
+  area,
+  onArea,
   onContinue,
   onBack,
 }: {
   shellStep: number;
-  neighborhood: string;
-  workArea: string | null;
-  onNeighborhood: (v: string) => void;
-  onWorkArea: (v: string | null) => void;
+  area: Area | null;
+  onArea: (v: Area) => void;
   onContinue: () => void;
   onBack: () => void;
 }) {
   return (
     <Shell
       step={shellStep}
-      canContinue={true}
+      canContinue={area !== null}
       continueLabel="That's my spot →"
       onContinue={onContinue}
       onBack={onBack}
-      scrollable
     >
       <Text style={sc.headline}>{"What part of LA\ndo you call home?"}</Text>
       <Text style={sc.subhead}>We'll prioritize moves close to you.</Text>
 
-      <DrumPicker
-        items={NEIGHBORHOODS}
-        selected={neighborhood}
-        onSelect={onNeighborhood}
-      />
-
-      <Text style={nb.optLabel}>School or work area? (optional)</Text>
-      <DrumPicker
-        items={["—", ...NEIGHBORHOODS]}
-        selected={workArea ?? "—"}
-        onSelect={(v) => onWorkArea(v === "—" ? null : v)}
-      />
+      <View style={nb.pills}>
+        {AREAS.map((a) => {
+          const selected = area === a;
+          return (
+            <TouchableOpacity
+              key={a}
+              style={[nb.pill, selected && nb.pillSelected]}
+              activeOpacity={0.75}
+              onPress={() => onArea(a)}
+            >
+              <Text style={[nb.pillText, selected && nb.pillTextSelected]}>{a}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </Shell>
   );
 }
 
 const nb = StyleSheet.create({
-  optLabel: {
-    fontSize: 13,
-    color: MUTED,
+  pills: {
+    marginTop: 32,
+    gap: 12,
+  },
+  pill: {
+    width: "100%",
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: CARD,
+    borderWidth: 1.5,
+    borderColor: "#2A2A2A",
+    alignItems: "center",
+  },
+  pillSelected: {
+    borderColor: PEACH,
+    backgroundColor: "#2C1810",
+  },
+  pillText: {
+    fontSize: 16,
     fontWeight: "600",
-    textAlign: "center",
-    marginTop: 28,
-    marginBottom: 8,
-    letterSpacing: 0.3,
+    color: MUTED_LIGHT,
+  },
+  pillTextSelected: {
+    color: PEACH,
   },
 });
 
@@ -2216,8 +2240,7 @@ export default function OnboardingScreen() {
   const [freeNightStyle, setFreeNightStyle] = useState<FreeNightStyle>(null);
   const [userAge, setUserAge] = useState(22);
   const [userGender, setUserGender] = useState<Gender>(null);
-  const [userNeighborhood, setUserNeighborhood] = useState(NEIGHBORHOODS[1]); // Silver Lake
-  const [userWorkArea, setUserWorkArea] = useState<string | null>(null);
+  const [userArea, setUserArea] = useState<Area | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [userInterests, setUserInterests] = useState<string[]>([]);
   const [userBudget, setUserBudget] = useState(30);
@@ -2279,8 +2302,7 @@ export default function OnboardingScreen() {
       AsyncStorage.setItem("freeNightStyle", freeNightStyle ?? ""),
       AsyncStorage.setItem("userAge", String(userAge)),
       AsyncStorage.setItem("userGender", userGender ?? ""),
-      AsyncStorage.setItem("userNeighborhood", userNeighborhood),
-      AsyncStorage.setItem("userWorkArea", userWorkArea ?? ""),
+      AsyncStorage.setItem("userArea", userArea ?? ""),
       AsyncStorage.setItem("userLocation", JSON.stringify(userLocation)),
       AsyncStorage.setItem("userInterests", JSON.stringify(userInterests)),
       AsyncStorage.setItem("userBudget", String(userBudget)),
@@ -2294,8 +2316,8 @@ export default function OnboardingScreen() {
       energyMode: "mixed",
       placeMode: "both",
       preferredTimes: ["morning", "midday", "afternoon", "evening", "night"],
-      homeCity: userNeighborhood,
-      schoolOrWork: userWorkArea ?? "",
+      homeCity: userArea ? (AREA_DISPLAY[userArea] ?? userArea) : "",
+      schoolOrWork: "",
       ageRange,
       socialBattery: socialBatteryPref,
       hungerPreference: "any",
@@ -2378,20 +2400,20 @@ export default function OnboardingScreen() {
   if (step === 9) return (
     <NeighborhoodScreen
       shellStep={ss}
-      neighborhood={userNeighborhood}
-      workArea={userWorkArea}
-      onNeighborhood={setUserNeighborhood}
-      onWorkArea={setUserWorkArea}
+      area={userArea}
+      onArea={setUserArea}
       onContinue={goNext}
       onBack={goBack}
     />
   );
 
+  const areaDisplay = userArea ? (AREA_DISPLAY[userArea] ?? userArea) : "LA";
+
   if (step === 10) return (
     <MidSell
       shellStep={ss}
       userAge={userAge}
-      userNeighborhood={userNeighborhood}
+      userNeighborhood={areaDisplay}
       userInterests={userInterests}
       onContinue={goNext}
       onBack={goBack}
@@ -2459,7 +2481,7 @@ export default function OnboardingScreen() {
   if (step === 16) return (
     <SetupScreen
       shellStep={ss}
-      userNeighborhood={userNeighborhood}
+      userNeighborhood={areaDisplay}
       userInterests={userInterests}
       userBudget={userBudget}
       userSocialStyle={userSocialStyle}
@@ -2470,7 +2492,7 @@ export default function OnboardingScreen() {
   // Step 17 — Payoff (navigated to after finish() saves data)
   return (
     <Payoff
-      userNeighborhood={userNeighborhood}
+      userNeighborhood={areaDisplay}
       userInterests={userInterests}
       onFinish={() => router.replace("/")}
     />
