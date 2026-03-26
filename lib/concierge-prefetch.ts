@@ -15,7 +15,7 @@ export async function prefetchConciergeDetailQuick(s: ConciergeSuggestion) {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const res = await fetch(`${SERVER_URL}/concierge-detail/quick`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-app-secret": process.env.EXPO_PUBLIC_APP_SECRET || "" },
       body: JSON.stringify({
         lat: loc.lat,
         lng: loc.lon,

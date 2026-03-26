@@ -162,7 +162,7 @@ export default function ConciergeDetailScreen() {
       if (!dataQ) {
         const resQ = await fetch(`${SERVER_URL}/concierge-detail/quick`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-app-secret": process.env.EXPO_PUBLIC_APP_SECRET || "" },
           body: JSON.stringify(body),
         });
         dataQ = (await resQ.json().catch(() => ({}))) as DetailApi & { error?: string };
@@ -186,7 +186,7 @@ export default function ConciergeDetailScreen() {
       try {
         const resN = await fetch(`${SERVER_URL}/concierge-detail/narrative`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-app-secret": process.env.EXPO_PUBLIC_APP_SECRET || "" },
           body: JSON.stringify({
             suggestion: p.suggestion,
             quickSnapshot: dataQ.quickSnapshot,
@@ -300,7 +300,7 @@ export default function ConciergeDetailScreen() {
     try {
       const res = await fetch(`${SERVER_URL}/concierge-chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-app-secret": process.env.EXPO_PUBLIC_APP_SECRET || "" },
         body: JSON.stringify({
           suggestion,
           detail,

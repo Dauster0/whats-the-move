@@ -266,7 +266,7 @@ export default function HomeScreen() {
 
     const res = await fetch(`${SERVER_URL}/concierge-recommendations`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-app-secret": process.env.EXPO_PUBLIC_APP_SECRET || "" },
       body: JSON.stringify({
         lat: loc.lat,
         lng: loc.lon,

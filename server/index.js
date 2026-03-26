@@ -96,6 +96,45 @@ const detailLimiter = makeRateLimiter({
   message: { error: "Too many requests — try again in a minute." },
 });
 
+/** Shared secret — rejects callers without the app token. Set APP_SECRET in Railway env vars. */
+const APP_SECRET = (process.env.APP_SECRET || "").trim();
+function requireSecret(req, res, next) {
+  if (!APP_SECRET) return next(); // not set during local dev — open
+  if (req.headers["x-app-secret"] !== APP_SECRET) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+  next();
+}
+
+/** Daily GPT call budget — resets at midnight UTC. Prevents runaway spend if beta goes wide. */
+let _dailyGptCount = 0;
+let _dailyGptDay = new Date().toDateString();
+const DAILY_GPT_LIMIT = 300;
+function dailyCap(req, res, next) {
+  const today = new Date().toDateString();
+  if (today !== _dailyGptDay) { _dailyGptCount = 0; _dailyGptDay = today; }
+  if (++_dailyGptCount > DAILY_GPT_LIMIT) {
+    console.warn(`[dailyCap] hit ${_dailyGptCount} GPT calls today — returning 429`);
+    return res.status(429).json({ error: "We've hit today's limit — check back after midnight." });
+  }
+  next();
+}
+
+/** Map raw server/network errors to user-friendly one-liners. */
+function friendlyServerError(err) {
+  const msg = String(err?.message || err || "").toLowerCase();
+  if (msg.includes("abort") || msg.includes("timeout") || msg.includes("etimedout") || msg.includes("econnrefused")) {
+    return "Took too long to load — pull to try again.";
+  }
+  if (msg.includes("json") || msg.includes("parse") || msg.includes("unexpected token")) {
+    return "Couldn't load suggestions. Pull to try again.";
+  }
+  if (msg.includes("rate limit") || msg.includes("quota") || msg.includes("429")) {
+    return "AI is busy right now — pull to try again in a moment.";
+  }
+  return "Couldn't load suggestions. Pull to try again.";
+}
+
 /** Bumped when photo sourcing changes — check Railway after deploy (must match this repo). */
 const PHOTO_PIPELINE = "google-places-hero-v1";
 
@@ -2461,79 +2500,79 @@ app.post("/generate-moves", async (req, res) => {
 });
 
 /** GPT-4o orchestration: Ticketmaster + Places + weather → ranked cards + Unsplash heroes */
-app.post("/concierge-recommendations", aiLimiter, async (req, res) => {
+app.post("/concierge-recommendations", requireSecret, dailyCap, aiLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeRecommendations(req.body || {});
     res.json(out);
   } catch (err) {
     console.error("concierge-recommendations:", err?.message || err);
-    res.status(422).json({
-      error: String(err?.message || err),
+    res.status(500).json({
+      error: friendlyServerError(err),
       suggestions: [],
       meta: null,
     });
   }
 });
 
-app.post("/concierge-ahead", aiLimiter, async (req, res) => {
+app.post("/concierge-ahead", requireSecret, dailyCap, aiLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeAheadRecommendations(req.body || {});
     res.json(out);
   } catch (err) {
     console.error("concierge-ahead:", err?.message || err);
-    res.status(422).json({
-      error: String(err?.message || err),
+    res.status(500).json({
+      error: friendlyServerError(err),
       suggestions: [],
       meta: null,
     });
   }
 });
 
-app.post("/concierge-detail", detailLimiter, async (req, res) => {
+app.post("/concierge-detail", requireSecret, detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetail(req.body || {});
     res.json(out);
   } catch (err) {
     console.error("concierge-detail:", err?.message || err);
-    res.status(422).json({
-      error: String(err?.message || err),
+    res.status(500).json({
+      error: friendlyServerError(err),
       detail: null,
     });
   }
 });
 
-app.post("/concierge-detail/quick", detailLimiter, async (req, res) => {
+app.post("/concierge-detail/quick", requireSecret, detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetailQuick(req.body || {});
     res.json(out);
   } catch (err) {
     console.error("concierge-detail/quick:", err?.message || err);
-    res.status(422).json({
-      error: String(err?.message || err),
+    res.status(500).json({
+      error: friendlyServerError(err),
       detail: null,
     });
   }
 });
 
-app.post("/concierge-detail/narrative", detailLimiter, async (req, res) => {
+app.post("/concierge-detail/narrative", requireSecret, detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const out = await runConciergeDetailNarrative(req.body || {});
     res.json(out);
   } catch (err) {
     console.error("concierge-detail/narrative:", err?.message || err);
-    res.status(422).json({
-      error: String(err?.message || err),
+    res.status(500).json({
+      error: friendlyServerError(err),
       detail: null,
     });
   }
 });
 
-app.post("/concierge-chat", detailLimiter, async (req, res) => {
+app.post("/concierge-chat", requireSecret, detailLimiter, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     const { suggestion = {}, detail = {}, messages = [], userMessage = "" } = req.body || {};

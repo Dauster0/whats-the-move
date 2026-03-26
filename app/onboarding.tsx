@@ -121,6 +121,9 @@ export default function OnboardingScreen() {
               </View>
             </View>
           ))}
+          {preferences.interests.length === 0 && (
+            <Text style={styles.interestHint}>Pick at least one so suggestions aren't random.</Text>
+          )}
         </>
       )}
 
@@ -362,6 +365,12 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
     marginBottom: 10,
     letterSpacing: 0.4,
     textTransform: "uppercase",
+  },
+  interestHint: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 16,
+    textAlign: "center",
   },
   chipGrid: {
     flexDirection: "row",
