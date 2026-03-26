@@ -1,6 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
+import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { getColors } from "../lib/theme";
 import { MoveProvider } from "../store/move-context";
@@ -38,6 +39,16 @@ function StackWithTheme() {
 }
 
 export default function RootLayout() {
+  // TEMP: clear onboarding storage so app launches from Screen 1.
+  // Remove this useEffect when done testing.
+  useEffect(() => {
+    AsyncStorage.multiRemove([
+      "has_finished_onboarding",
+      "hasCompletedOnboarding",
+      "user_preferences_v3",
+    ]);
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <MoveProvider>
