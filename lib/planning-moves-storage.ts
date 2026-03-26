@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ConciergeSuggestion } from "./concierge-types";
-import { isPlusEffective, loadEntitlements } from "./plus-entitlements";
+import { isPlusEffectiveOrDev, loadEntitlements } from "./plus-entitlements";
 
 const KEY = "@concierge/planning-moves-v1";
 const MAX = 60;
@@ -29,7 +29,7 @@ export async function getPlanningConciergeMoves(): Promise<PlanningConciergeMove
 
 export async function addPlanningConciergeMove(suggestion: ConciergeSuggestion): Promise<boolean> {
   const e = await loadEntitlements();
-  if (!isPlusEffective(e)) return false;
+  if (!isPlusEffectiveOrDev(e)) return false;
   const id = stableId(suggestion);
   const existing = await getPlanningConciergeMoves();
   const next: PlanningConciergeMove[] = [

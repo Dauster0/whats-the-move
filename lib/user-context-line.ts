@@ -9,6 +9,7 @@ export function buildUserContextLine(prefs: UserPreferences): string {
 
   bits.push(`budget ${prefs.budget}`);
   bits.push(`energy ${prefs.energyMode}`);
+  if (prefs.transportMode) bits.push(`gets around by ${prefs.transportMode}`);
   bits.push(`social style ${prefs.socialMode}`);
   bits.push(`social battery ${prefs.socialBattery}`);
 

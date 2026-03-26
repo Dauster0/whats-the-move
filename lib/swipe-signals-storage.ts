@@ -6,10 +6,19 @@ const MAX_EVENTS = 400;
 /** After this many tracked swipes, send aggregates to the concierge model. */
 const MIN_FOR_API = 20;
 
+export type SkipReason =
+  | "too_far"
+  | "too_expensive"
+  | "not_today"
+  | "already_been"
+  | "not_my_thing";
+
 export type SwipeSignalsPayload = {
   strong_yes: string[];
   skipped_often: string[];
   never_show: string[];
+  /** Aggregated counts of why the user said no — used to tune distance/cost/category bias. */
+  skip_reasons?: Partial<Record<SkipReason, number>>;
 };
 
 type SwipeType = "commit" | "skip" | "bookmark";
@@ -21,7 +30,7 @@ function normCat(c: string) {
     .slice(0, 48);
 }
 
-async function load(): Promise<{ type: SwipeType; category: string; at: string }[]> {
+async function load(): Promise<{ type: SwipeType; category: string; at: string; reason?: string }[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return [];
@@ -32,7 +41,7 @@ async function load(): Promise<{ type: SwipeType; category: string; at: string }
   }
 }
 
-async function append(ev: { type: SwipeType; category: string }) {
+async function append(ev: { type: SwipeType; category: string; reason?: string }) {
   const prev = await load();
   const next = [{ ...ev, at: new Date().toISOString() }, ...prev].slice(0, MAX_EVENTS);
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
@@ -46,6 +55,10 @@ export async function recordSwipeSkip(category: string) {
   await append({ type: "skip", category: normCat(category) });
 }
 
+export async function recordSwipeSkipWithReason(category: string, reason: SkipReason) {
+  await append({ type: "skip", category: normCat(category), reason });
+}
+
 export async function recordSwipeBookmark(category: string) {
   await append({ type: "bookmark", category: normCat(category) });
 }
@@ -56,6 +69,7 @@ export async function getSwipeSignalsForApi(): Promise<SwipeSignalsPayload | nul
 
   const yesCounts: Record<string, number> = {};
   const skipCounts: Record<string, number> = {};
+  const reasonCounts: Partial<Record<SkipReason, number>> = {};
 
   for (const e of events) {
     const c = e.category || "other";
@@ -64,6 +78,10 @@ export async function getSwipeSignalsForApi(): Promise<SwipeSignalsPayload | nul
     }
     if (e.type === "skip") {
       skipCounts[c] = (skipCounts[c] || 0) + 1;
+      if (e.reason) {
+        const r = e.reason as SkipReason;
+        reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+      }
     }
   }
 
@@ -82,5 +100,7 @@ export async function getSwipeSignalsForApi(): Promise<SwipeSignalsPayload | nul
   const hidden = await getHiddenSuggestions();
   const never_show = hidden.map((h) => h.title).filter(Boolean).slice(0, 24);
 
-  return { strong_yes, skipped_often, never_show };
+  const skip_reasons = Object.keys(reasonCounts).length > 0 ? reasonCounts : undefined;
+
+  return { strong_yes, skipped_often, never_show, ...(skip_reasons ? { skip_reasons } : {}) };
 }

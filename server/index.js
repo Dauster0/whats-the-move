@@ -2507,6 +2507,69 @@ app.post("/concierge-detail/narrative", async (req, res) => {
   }
 });
 
+app.post("/concierge-chat", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const { suggestion = {}, detail = {}, messages = [], userMessage = "" } = req.body || {};
+    if (!userMessage?.trim()) return res.status(400).json({ error: "userMessage required" });
+
+    const title = suggestion.title || "this move";
+    const address = detail?.logistics?.address || suggestion.address || "";
+    const cost = detail?.cost?.label || suggestion.cost || "";
+    const timeLine = detail?.logistics?.timeLine || suggestion.startTime || "";
+    const description = suggestion.description || "";
+    const narrative = [
+      detail?.narrative?.paragraphFriend,
+      detail?.narrative?.paragraphWhyNow,
+      detail?.narrative?.paragraphOrderThis,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const logistics = [
+      address && `Address: ${address}`,
+      cost && `Cost: ${cost}`,
+      timeLine && `Time: ${timeLine}`,
+      detail?.logistics?.distanceText && `Distance: ${detail.logistics.distanceText}`,
+      detail?.logistics?.hoursLine && `Hours: ${detail.logistics.hoursLine}`,
+      detail?.logistics?.parking && `Parking: ${detail.logistics.parking}`,
+      detail?.place?.websiteUri && `Website: ${detail.place.websiteUri}`,
+      detail?.place?.phone && `Phone: ${detail.place.phone}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const systemPrompt = `You are a helpful assistant for the app "What's the Move?". The user is looking at a specific move and has questions about it.
+
+Move: ${title}
+${description ? `Description: ${description}` : ""}
+${narrative ? `Details: ${narrative}` : ""}
+${logistics ? `Logistics:\n${logistics}` : ""}
+
+Answer the user's questions about this specific move. Be direct and factual. If you don't know something (like real-time availability, exact transit routes, or current prices), say so and suggest how they might find out (e.g., call ahead, check the website). Keep answers concise — 1–3 sentences unless a longer answer is clearly needed. Never invent facts you're not sure about.`;
+
+    const history = (messages || [])
+      .filter((m) => m?.role && m?.content)
+      .slice(-10)
+      .map((m) => ({ role: m.role, content: String(m.content) }));
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 300,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: userMessage.trim() },
+      ],
+    });
+
+    const reply = completion.choices?.[0]?.message?.content?.trim() || "I'm not sure — try checking their website or calling ahead.";
+    res.json({ reply });
+  } catch (err) {
+    console.error("concierge-chat:", err?.message || err);
+    res.status(500).json({ error: "Chat unavailable right now." });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 /** Bind IPv6 `::` so `curl http://localhost:PORT` (often ::1) hits this server. `0.0.0.0` is IPv4-only and another process can own ::1:PORT — same port, wrong app → "Cannot GET /place-details". */
 const LISTEN_HOST = process.env.LISTEN_HOST || "::";

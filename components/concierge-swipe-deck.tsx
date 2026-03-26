@@ -204,14 +204,15 @@ const styles = StyleSheet.create({
   wrap: {
     position: "relative",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     overflow: "hidden",
   },
+  /** Top-aligned so tall cards aren’t clipped from above (hero image stays visible). */
   cardSlot: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
+    top: 0,
     alignItems: "center",
   },
   labelOverlay: {

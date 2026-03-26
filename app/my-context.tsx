@@ -15,6 +15,7 @@ import { useMoveStore } from "../store/move-context";
 
 const AGE_OPTIONS: UserPreferences["ageRange"][] = [
   "under18",
+  "18-21",
   "18-24",
   "25-34",
   "35-44",
@@ -26,6 +27,13 @@ const BATTERY: UserPreferences["socialBattery"][] = [
   "introvert",
   "ambivert",
   "extrovert",
+];
+
+const TRANSPORT_OPTIONS: { key: UserPreferences["transportMode"]; label: string }[] = [
+  { key: "walking", label: "Walking" },
+  { key: "cycling", label: "Cycling" },
+  { key: "transit", label: "Transit" },
+  { key: "driving", label: "Driving" },
 ];
 
 export default function MyContextScreen() {
@@ -41,6 +49,9 @@ export default function MyContextScreen() {
   const [socialBattery, setSocialBattery] = useState<UserPreferences["socialBattery"]>(
     preferences.socialBattery ?? "ambivert"
   );
+  const [transportMode, setTransportMode] = useState<UserPreferences["transportMode"]>(
+    preferences.transportMode ?? "driving"
+  );
 
   function save() {
     setPreferences({
@@ -49,6 +60,7 @@ export default function MyContextScreen() {
       schoolOrWork: schoolOrWork.trim(),
       ageRange,
       socialBattery,
+      transportMode,
     });
     router.back();
   }
@@ -127,6 +139,22 @@ export default function MyContextScreen() {
               onPress={() => setSocialBattery(b)}
             >
               <Text style={[styles.choiceText, active && styles.choiceTextActive]}>{b}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.fieldLabel}>How do you get around?</Text>
+      <View style={styles.chipGrid}>
+        {TRANSPORT_OPTIONS.map(({ key, label }) => {
+          const active = transportMode === key;
+          return (
+            <Pressable
+              key={key}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setTransportMode(key)}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
             </Pressable>
           );
         })}

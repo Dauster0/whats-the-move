@@ -29,11 +29,13 @@ export type UserPreferences = {
   homeCity: string;
   /** School, campus, or work area — optional anchor for “near campus” style ideas */
   schoolOrWork: string;
-  ageRange: "under18" | "18-24" | "25-34" | "35-44" | "45+" | "prefer_not";
+  ageRange: "under18" | "18-21" | "18-24" | "25-34" | "35-44" | "45+" | "prefer_not";
   /** Separate from socialMode: introverts get fewer “ping a friend” nudges */
-  socialBattery: "introvert" | "ambivert" | "extrovert";
+  socialBattery: “introvert” | “ambivert” | “extrovert”;
   /** Food tilt for concierge deck (same idea as old “Hungry?” full finder). */
   hungerPreference: HungerPreference;
+  /** How the user gets around — affects distance bias in suggestions. */
+  transportMode: “walking” | “cycling” | “transit” | “driving”;
 };
 
 type MoveContextType = {
@@ -75,6 +77,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   ageRange: "prefer_not",
   socialBattery: "ambivert",
   hungerPreference: "any",
+  transportMode: "driving",
 };
 
 function getStartOfDay(date: Date) {
@@ -158,6 +161,7 @@ export function MoveProvider({ children }: { children: ReactNode }) {
               typeof parsed?.schoolOrWork === "string" ? parsed.schoolOrWork : "",
             ageRange:
               parsed?.ageRange === "under18" ||
+              parsed?.ageRange === "18-21" ||
               parsed?.ageRange === "18-24" ||
               parsed?.ageRange === "25-34" ||
               parsed?.ageRange === "35-44" ||
@@ -177,6 +181,13 @@ export function MoveProvider({ children }: { children: ReactNode }) {
               parsed?.hungerPreference === "any"
                 ? parsed.hungerPreference
                 : "any",
+            transportMode:
+              parsed?.transportMode === "walking" ||
+              parsed?.transportMode === "cycling" ||
+              parsed?.transportMode === "transit" ||
+              parsed?.transportMode === "driving"
+                ? parsed.transportMode
+                : "driving",
           });
         }
 

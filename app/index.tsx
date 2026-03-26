@@ -42,6 +42,8 @@ import {
   getSwipeSignalsForApi,
   recordSwipeCommit,
   recordSwipeSkip,
+  recordSwipeSkipWithReason,
+  type SkipReason,
 } from "../lib/swipe-signals-storage";
 import {
   getSavedConciergeMoves,
@@ -81,6 +83,11 @@ import {
 } from "../lib/suggestion-decay-storage";
 import { setPeekDetailHandlers } from "../lib/peek-detail-handlers";
 import { ComingUpPanel } from "../components/coming-up-panel";
+import {
+  saveCommittedMove,
+  getPendingCommittedCheckIn,
+  dismissCommittedCheckIn,
+} from "../lib/committed-move-storage";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const DECK_W = SCREEN_W - spacing.md * 2;
@@ -163,14 +170,12 @@ export default function HomeScreen() {
     [colors, insets.top, insets.bottom]
   );
 
-  /** Deck fits between filters and ✕/✓ on iPhone 14-class screens (conservative reserve). */
+  /** Deck height: topBar + tabRow above; deck buttons below. Filters are hidden by default. */
   const DECK_HEIGHT = useMemo(() => {
-    /** Filters + tabs + swipe hint + breathing room so cards don’t cover the hint. */
-    const reservedAboveDeck = 260;
-    const deckButtonsAndGap = 80;
-    const raw =
-      SCREEN_H - insets.top - insets.bottom - reservedAboveDeck - deckButtonsAndGap;
-    return Math.max(420, Math.min(580, raw));
+    const aboveDeck = 110; // topBar ~50 + tabRow ~44 + small gap
+    const belowDeck = 90;  // deck buttons + breathing room
+    const raw = SCREEN_H - insets.top - insets.bottom - aboveDeck - belowDeck;
+    return Math.max(420, Math.min(560, raw));
   }, [insets.top, insets.bottom]);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
   const { isPlus, loaded: plusLoaded, refresh: refreshPlus } = usePlusEntitlements();
@@ -210,8 +215,12 @@ export default function HomeScreen() {
 
   const [thirdRefreshModalVisible, setThirdRefreshModalVisible] = useState(false);
   const [deckRefreshSoft, setDeckRefreshSoft] = useState(false);
+  const [pendingRejection, setPendingRejection] = useState<{ category: string } | null>(null);
+  const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [trialEndBannerVisible, setTrialEndBannerVisible] = useState(false);
   const [sharperPicksBannerVisible, setSharperPicksBannerVisible] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [postMoveCheckIn, setPostMoveCheckIn] = useState<{ title: string; category: string } | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -265,6 +274,7 @@ export default function HomeScreen() {
         userContextLine: buildUserContextLine(prefs),
         hungerPreference: prefs.hungerPreference ?? "any",
         ageRange: prefs.ageRange ?? "prefer_not",
+        transportMode: prefs.transportMode ?? "driving",
         ...(swipeSignals ? { swipeSignals } : {}),
         ...(deckCategoryFocus ? { deckCategoryFocus } : {}),
       }),
@@ -395,6 +405,9 @@ export default function HomeScreen() {
       }
       if (suggestionsLenRef.current > 0) return;
       void load("background");
+      void getPendingCommittedCheckIn().then((pending) => {
+        if (pending) setPostMoveCheckIn(pending);
+      });
     }, [isLoaded, hasFinishedOnboarding, load, refreshPlus])
   );
 
@@ -407,7 +420,7 @@ export default function HomeScreen() {
   }, [suggestions]);
 
   useEffect(() => {
-    if (!isPlus || suggestions.length !== 2 || loading || prefetchingNextDeckRef.current) return;
+    if (suggestions.length > 2 || loading || prefetchingNextDeckRef.current) return;
     prefetchingNextDeckRef.current = true;
     void (async () => {
       try {
@@ -419,7 +432,7 @@ export default function HomeScreen() {
         prefetchingNextDeckRef.current = false;
       }
     })();
-  }, [isPlus, suggestions.length, loading, fetchDeckList]);
+  }, [suggestions.length, loading, fetchDeckList]);
 
   const applyNextDeckOrEmpty = useCallback(
     (prev: ConciergeSuggestion[]) => {
@@ -479,6 +492,7 @@ export default function HomeScreen() {
     }
     if (isPlusRef.current) void recordDecayCommitted(s);
     void recordSwipeCommit(s.category || "experience");
+    void saveCommittedMove(s.title, s.category || "experience");
     persistSwipeForHistory(s);
     const u = String(s.ticketUrl || "").trim();
     if (u) Linking.openURL(u).catch(() => {});
@@ -529,6 +543,7 @@ export default function HomeScreen() {
       onCommit: () => {
         if (isPlusRef.current) void recordDecayCommitted(s);
         void recordSwipeCommit(s.category || "experience");
+        void saveCommittedMove(s.title, s.category || "experience");
         persistSwipeForHistory(s);
         const u = String(s.ticketUrl || "").trim();
         if (u) Linking.openURL(u).catch(() => {});
@@ -563,11 +578,13 @@ export default function HomeScreen() {
 
   const commitSwipeLeft = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    let skippedCategory = "experience";
     setSuggestions((prev) => {
       const s = prev[0];
       if (!s) return prev;
+      skippedCategory = s.category || "experience";
       if (isPlusRef.current) void recordDecayRejected(s);
-      void recordSwipeSkip(s.category || "experience");
+      void recordSwipeSkip(skippedCategory);
       if (!isWildcardLocked(s, isPlusRef.current)) {
         void pushRecentConciergeTitle(s.title);
         persistSwipeForHistory(s);
@@ -576,6 +593,10 @@ export default function HomeScreen() {
       if (next.length === 0) return applyNextDeckOrEmpty(prev);
       return next;
     });
+    // Show rejection reason chips briefly so the app can learn why
+    if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
+    setPendingRejection({ category: skippedCategory });
+    rejectionTimerRef.current = setTimeout(() => setPendingRejection(null), 4000);
     setLeftDismissStreak((st) => {
       const n = st + 1;
       if (n >= 3) {
@@ -673,6 +694,25 @@ export default function HomeScreen() {
         <Text style={styles.areaPill} numberOfLines={1}>
           {areaLabel || "Near you"}
         </Text>
+        {homeTab === "forYou" ? (
+          <Pressable
+            style={[styles.filterBtn, filtersVisible && styles.filterBtnActive]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setFiltersVisible((v) => !v);
+            }}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="options-outline"
+              size={17}
+              color={filtersVisible ? colors.textInverse : colors.text}
+            />
+            <Text style={[styles.filterBtnText, filtersVisible && styles.filterBtnTextActive]}>
+              Filters
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={styles.menuBtn}
           onPress={() => {
@@ -803,8 +843,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <Text style={styles.screenTitle}>{"What's the move?"}</Text>
-
       <View style={styles.tabRow}>
         <Pressable
           style={[styles.tab, homeTab === "forYou" && styles.tabActive]}
@@ -880,7 +918,8 @@ export default function HomeScreen() {
         )
       ) : homeTab === "forYou" ? (
       <>
-      <View style={styles.controlBlock}>
+      {filtersVisible ? <View style={styles.controlBlock}>
+        <View style={styles.controlFilterRow}>
         <Text style={styles.controlLabel}>Energy</Text>
         <View style={styles.segmentRow}>
             {(
@@ -912,55 +951,60 @@ export default function HomeScreen() {
             );
           })}
         </View>
-
-        <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Time</Text>
-        <View style={styles.segmentRow}>
-          {(
-            [
-              { key: "30min" as const, label: "~30 min" },
-              { key: "mid" as const, label: "1–3 hrs" },
-              { key: "allday" as const, label: "No rush" },
-            ] as const
-          ).map(({ key, label }) => {
-            const active = timeBudget === key;
-            return (
-              <Pressable
-                key={key}
-                style={[styles.segment, active && styles.segmentActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setTimeBudget(key);
-                }}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
         </View>
 
-        <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Hungry?</Text>
-        <View style={styles.segmentRow}>
-          {(
-            [
-              { key: "any" as const, label: "Either" },
-              { key: "hungry" as const, label: "Hungry" },
-              { key: "not_hungry" as const, label: "Not hungry" },
-            ] as const
-          ).map(({ key, label }) => {
-            const active = (preferences.hungerPreference ?? "any") === key;
-            return (
-              <Pressable
-                key={key}
-                style={[styles.segment, active && styles.segmentActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setPreferences({ ...preferences, hungerPreference: key });
-                }}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.controlFilterRow}>
+          <Text style={styles.controlLabel}>Time</Text>
+          <View style={styles.segmentRow}>
+            {(
+              [
+                { key: "30min" as const, label: "~30 min" },
+                { key: "mid" as const, label: "1–3 hrs" },
+                { key: "allday" as const, label: "No rush" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = timeBudget === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.segment, active && styles.segmentActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setTimeBudget(key);
+                  }}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.controlFilterRow}>
+          <Text style={styles.controlLabel}>Hungry?</Text>
+          <View style={styles.segmentRow}>
+            {(
+              [
+                { key: "any" as const, label: "Either" },
+                { key: "hungry" as const, label: "Hungry" },
+                { key: "not_hungry" as const, label: "Not hungry" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = (preferences.hungerPreference ?? "any") === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.segment, active && styles.segmentActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setPreferences({ ...preferences, hungerPreference: key });
+                  }}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {userInterestDeckChips.length > 0 ? (
@@ -996,7 +1040,7 @@ export default function HomeScreen() {
             </ScrollView>
           </>
         ) : null}
-      </View>
+      </View> : null}
 
       {loading && suggestions.length === 0 ? (
         <View style={styles.loadingBlock}>
@@ -1037,9 +1081,6 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          <Text style={styles.swipeHint}>
-            {suggestions.length} in this deck — tap a card to read first, or swipe right if you’re going
-          </Text>
           <View style={styles.deckWrap}>
             <ConciergeSwipeDeck
               suggestions={suggestions}
@@ -1088,11 +1129,39 @@ export default function HomeScreen() {
                 textInverse: colors.textInverse,
               }}
             />
+            {pendingRejection ? (
+              <View style={styles.rejectionRow}>
+                <Text style={styles.rejectionLabel}>Why not?</Text>
+                {(
+                  [
+                    { key: "too_far" as SkipReason, label: "Too far" },
+                    { key: "too_expensive" as SkipReason, label: "Too expensive" },
+                    { key: "not_today" as SkipReason, label: "Not today" },
+                    { key: "already_been" as SkipReason, label: "Already been" },
+                    { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <Pressable
+                    key={key}
+                    style={styles.rejectionChip}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      void recordSwipeSkipWithReason(pendingRejection.category, key);
+                      if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
+                      setPendingRejection(null);
+                    }}
+                  >
+                    <Text style={styles.rejectionChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
         </>
       )}
       </>
       ) : (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.savedListWrap}>
           {savedRows.length === 0 ? (
             <Text style={[styles.savedEmpty, { color: colors.textMuted }]}>
@@ -1132,8 +1201,60 @@ export default function HomeScreen() {
             ))
           )}
         </View>
+        </ScrollView>
       )}
     </ScrollView>
+
+    {/* Post-move check-in modal */}
+    <Modal
+      visible={!!postMoveCheckIn}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        void dismissCommittedCheckIn();
+        setPostMoveCheckIn(null);
+      }}
+    >
+      <View style={styles.checkInRoot}>
+        <Pressable
+          style={styles.checkInBackdrop}
+          onPress={() => {
+            void dismissCommittedCheckIn();
+            setPostMoveCheckIn(null);
+          }}
+        />
+        <View style={[styles.checkInCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
+          <Text style={[styles.checkInTitle, { color: colors.text }]}>
+            How did it go?
+          </Text>
+          <Text style={[styles.checkInSub, { color: colors.textMuted }]} numberOfLines={2}>
+            {postMoveCheckIn?.title}
+          </Text>
+          <View style={styles.checkInRow}>
+            {(
+              [
+                { emoji: "👍", label: "Loved it" },
+                { emoji: "😐", label: "It was ok" },
+                { emoji: "👎", label: "Didn't go" },
+              ] as const
+            ).map(({ emoji, label }) => (
+              <Pressable
+                key={label}
+                style={[styles.checkInOption, { borderColor: colors.border, backgroundColor: colors.bg }]}
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  void dismissCommittedCheckIn();
+                  setPostMoveCheckIn(null);
+                }}
+              >
+                <Text style={styles.checkInEmoji}>{emoji}</Text>
+                <Text style={[styles.checkInOptionText, { color: colors.text }]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Modal>
     </View>
   );
 }
@@ -1191,6 +1312,29 @@ function createStyles(
       justifyContent: "center",
       backgroundColor: colors.bgCard,
     },
+    filterBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgCard,
+    },
+    filterBtnActive: {
+      backgroundColor: colors.bgDark,
+      borderColor: colors.bgDark,
+    },
+    filterBtnText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    filterBtnTextActive: {
+      color: colors.textInverse,
+    },
     screenTitle: {
       fontSize: 28,
       fontWeight: "700",
@@ -1235,12 +1379,36 @@ function createStyles(
     tabTextActive: {
       color: colors.textInverse,
     },
+    rejectionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+    },
+    rejectionLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+    rejectionChip: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgCard,
+    },
+    rejectionChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.text,
+    },
     deckWrap: {
       alignItems: "center",
       paddingHorizontal: spacing.md,
-      paddingTop: spacing.sm,
-      marginTop: spacing.xl,
-      marginBottom: spacing.lg,
+      paddingTop: spacing.xs,
     },
     savedListWrap: {
       paddingHorizontal: spacing.md,
@@ -1279,13 +1447,19 @@ function createStyles(
     },
     controlBlock: {
       paddingHorizontal: spacing.md,
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    controlFilterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6,
     },
     controlLabel: {
       fontSize: 12,
       fontWeight: "600",
       color: colors.textMuted,
-      marginBottom: 8,
+      width: 52,
     },
     segmentRow: {
       flexDirection: "row",
@@ -1547,6 +1721,49 @@ function createStyles(
     comingUpLockedCtaText: {
       fontSize: 16,
       fontWeight: "800",
+    },
+    checkInRoot: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    checkInBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    checkInCard: {
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      padding: spacing.lg,
+      paddingBottom: Math.max(bottomPad + spacing.md, spacing.xl),
+    },
+    checkInTitle: {
+      fontSize: font.sizeXl,
+      fontWeight: "800",
+      marginBottom: 6,
+    },
+    checkInSub: {
+      fontSize: font.sizeMd,
+      marginBottom: spacing.lg,
+    },
+    checkInRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    checkInOption: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 14,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      gap: 6,
+    },
+    checkInEmoji: {
+      fontSize: 26,
+    },
+    checkInOptionText: {
+      fontSize: 12,
+      fontWeight: "700",
     },
   });
 }

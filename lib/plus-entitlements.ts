@@ -54,6 +54,24 @@ export function isPlusEffective(r: EntitlementsRecord): boolean {
   return false;
 }
 
+/**
+ * Full Plus for local development / internal QA without billing.
+ * - `__DEV__` (Expo / Metro) → unlocked so you can test without trial limits.
+ * - `EXPO_PUBLIC_DEV_PLUS=1` → unlocked in release-like builds (e.g. EAS internal).
+ * - `EXPO_PUBLIC_FORCE_FREE_TIER=1` → stay on free tier even in __DEV__ (test paywalls).
+ */
+export function isDevPlusUnlocked(): boolean {
+  if (process.env.EXPO_PUBLIC_FORCE_FREE_TIER === "1") return false;
+  if (typeof __DEV__ !== "undefined" && __DEV__) return true;
+  if (process.env.EXPO_PUBLIC_DEV_PLUS === "1") return true;
+  return false;
+}
+
+/** Stored subscription/trial OR dev/QA unlock. */
+export function isPlusEffectiveOrDev(r: EntitlementsRecord): boolean {
+  return isPlusEffective(r) || isDevPlusUnlocked();
+}
+
 export async function loadEntitlements(): Promise<EntitlementsRecord> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -116,7 +134,7 @@ async function rolloverRefreshDay(cur: EntitlementsRecord): Promise<Entitlements
 export async function canFreeUserDeckRefresh(): Promise<boolean> {
   const base = await loadEntitlements();
   const cur = await rolloverRefreshDay(base);
-  if (isPlusEffective(cur)) return true;
+  if (isPlusEffectiveOrDev(cur)) return true;
   return cur.refreshCount < 3;
 }
 
@@ -127,7 +145,7 @@ export async function consumeDeckRefreshCredit(): Promise<{
 }> {
   const base = await loadEntitlements();
   let cur = await rolloverRefreshDay(base);
-  if (isPlusEffective(cur)) {
+  if (isPlusEffectiveOrDev(cur)) {
     return { countAfter: cur.refreshCount, justUsedThird: false };
   }
   const refreshCount = cur.refreshCount + 1;
@@ -163,6 +181,7 @@ export function trialDaysRemaining(trialEndsAt: string | null): number | null {
 }
 
 export function shouldShowTrialEndingBanner(r: EntitlementsRecord): boolean {
+  if (isDevPlusUnlocked()) return false;
   if (!isPlusEffective(r) || r.isSubscribed) return false;
   if (r.trialEndingBannerShown) return false;
   return trialDaysRemaining(r.trialEndsAt) === 2;
@@ -173,6 +192,7 @@ export async function markTrialEndingBannerShown(): Promise<void> {
 }
 
 export function shouldShowSharperPicksLine(r: EntitlementsRecord): boolean {
+  if (isDevPlusUnlocked()) return false;
   if (!isPlusEffective(r) || r.sharperPicksToastShown) return false;
   if (!r.plusStartedAt) return false;
   const started = new Date(r.plusStartedAt).getTime();

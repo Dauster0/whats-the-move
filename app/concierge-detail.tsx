@@ -7,14 +7,17 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  KeyboardAvoidingView,
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -116,6 +119,11 @@ export default function ConciergeDetailScreen() {
   const [err, setErr] = useState("");
   const [heroIdx, setHeroIdx] = useState(0);
   const [saved, setSaved] = useState(false);
+
+  type ChatMessage = { role: "user" | "assistant"; content: string };
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoadingQuick(true);
@@ -282,6 +290,37 @@ export default function ConciergeDetailScreen() {
     });
   }, [detail, suggestion, title]);
 
+  async function sendChat() {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+    setChatInput("");
+    const userMsg: ChatMessage = { role: "user", content: msg };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatLoading(true);
+    try {
+      const res = await fetch(`${SERVER_URL}/concierge-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          suggestion,
+          detail,
+          messages: chatMessages,
+          userMessage: msg,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { reply?: string; error?: string };
+      const reply = data.reply || "Something went wrong — try again.";
+      setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Couldn't reach the server — check your connection." },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
   if (!suggestion && !loadingQuick) {
     return (
       <View style={styles.center}>
@@ -307,7 +346,10 @@ export default function ConciergeDetailScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -607,7 +649,57 @@ export default function ConciergeDetailScreen() {
             </>
           ) : null}
 
-          <View style={{ height: 120 }} />
+          {/* Chat */}
+          {!loadingQuick && suggestion ? (
+            <>
+              <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>Ask about this move</Text>
+              {chatMessages.map((m, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.chatBubble,
+                    m.role === "user" ? styles.chatBubbleUser : styles.chatBubbleAssistant,
+                    { backgroundColor: m.role === "user" ? colors.accent : colors.bgCard },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chatBubbleText,
+                      { color: m.role === "user" ? colors.textInverse : colors.text },
+                    ]}
+                  >
+                    {m.content}
+                  </Text>
+                </View>
+              ))}
+              {chatLoading ? (
+                <View style={[styles.chatBubble, styles.chatBubbleAssistant, { backgroundColor: colors.bgCard }]}>
+                  <ActivityIndicator size="small" color={colors.textMuted} />
+                </View>
+              ) : null}
+              <View style={[styles.chatInputRow, { borderColor: colors.border, backgroundColor: colors.bgCard }]}>
+                <TextInput
+                  style={[styles.chatInput, { color: colors.text }]}
+                  placeholder="Ask anything about this move…"
+                  placeholderTextColor={colors.textMuted}
+                  value={chatInput}
+                  onChangeText={setChatInput}
+                  onSubmitEditing={() => void sendChat()}
+                  returnKeyType="send"
+                  multiline={false}
+                />
+                <Pressable
+                  style={[styles.chatSendBtn, { backgroundColor: colors.accent, opacity: chatInput.trim() ? 1 : 0.4 }]}
+                  onPress={() => void sendChat()}
+                  disabled={!chatInput.trim() || chatLoading}
+                >
+                  <Ionicons name="arrow-up" size={18} color={colors.textInverse} />
+                </Pressable>
+              </View>
+            </>
+          ) : null}
+
+          <View style={{ height: 140 }} />
             </>
           ) : null}
         </View>
@@ -681,7 +773,7 @@ export default function ConciergeDetailScreen() {
           </Pressable>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -900,5 +992,47 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
     neverShowText: { fontSize: 13, fontWeight: "600" },
     backBtn: { marginTop: spacing.md, padding: 12 },
     backBtnText: { fontWeight: "700", color: colors.accent },
+    chatBubble: {
+      marginTop: spacing.sm,
+      padding: 12,
+      borderRadius: radius.md,
+      maxWidth: "85%",
+    },
+    chatBubbleUser: {
+      alignSelf: "flex-end",
+      borderBottomRightRadius: 4,
+    },
+    chatBubbleAssistant: {
+      alignSelf: "flex-start",
+      borderBottomLeftRadius: 4,
+    },
+    chatBubbleText: {
+      fontSize: font.sizeSm,
+      lineHeight: 20,
+      fontWeight: "500",
+    },
+    chatInputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginTop: spacing.md,
+      paddingLeft: 14,
+      paddingRight: 6,
+      paddingVertical: 6,
+      gap: 8,
+    },
+    chatInput: {
+      flex: 1,
+      fontSize: font.sizeMd,
+      paddingVertical: 8,
+    },
+    chatSendBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+    },
   });
 }

@@ -9,7 +9,7 @@ import React, {
 import {
   loadEntitlements,
   type EntitlementsRecord,
-  isPlusEffective,
+  isPlusEffectiveOrDev,
 } from "../lib/plus-entitlements";
 
 type PlusContextValue = {
@@ -39,7 +39,7 @@ export function PlusProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isPlus = useMemo(
-    () => (entitlements ? isPlusEffective(entitlements) : false),
+    () => (entitlements ? isPlusEffectiveOrDev(entitlements) : false),
     [entitlements]
   );
 

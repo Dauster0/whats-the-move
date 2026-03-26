@@ -792,14 +792,15 @@ function formatLocalWeekday(iso, tz) {
 
 function approximateAgeLabel(ageRange) {
   const m = {
-    under18: "17",
-    "18-24": "21",
+    under18: "16",
+    "18-21": "19",
+    "18-24": "22",
     "25-34": "29",
     "35-44": "39",
     "45+": "48",
-    prefer_not: "22",
+    prefer_not: "25",
   };
-  return m[ageRange] ?? "22";
+  return m[ageRange] ?? "25";
 }
 
 function buildGptUserPayload({
@@ -816,6 +817,7 @@ function buildGptUserPayload({
   nearbyPlacesAnnotated,
   userAge,
   swipeSignals,
+  transportMode,
   lat,
   lng,
   userContextLine,
@@ -885,9 +887,19 @@ function buildGptUserPayload({
     it_is_currently: `It is currently ${formatLocalClock(nowIso, timeZone)} on ${formatLocalWeekday(nowIso, timeZone)}. Every suggestion must make sense for this exact moment.`,
     meal_timing_rules: MEAL_TIMING_RULES_FOR_MODEL,
     late_night: lateNight,
+    transport_mode: transportMode || "driving",
     distance_guidance: lateNight
       ? "After 10pm: strongly prefer venues within ~1 mile unless a ticketed show justifies farther."
-      : "Prefer picks within ~2 miles; say why if farther.",
+      : transportMode === "walking"
+        ? "User is on foot — strongly prefer places within ~1 mile."
+        : transportMode === "cycling"
+          ? "User is cycling — prefer places within ~3 miles."
+          : transportMode === "transit"
+            ? "User is on transit — up to ~5 miles is fine; mention transit-friendliness when relevant."
+            : "Prefer picks within ~5 miles; say why if farther.",
+    ...(swipeSignals?.skip_reasons
+      ? { skip_reasons: swipeSignals.skip_reasons }
+      : {}),
     wildcard_prompt,
   };
 
@@ -997,7 +1009,7 @@ function normalizeSuggestions(raw) {
       row.googlePlaceResourceName = placeId.slice(0, 256);
     }
     out.push(row);
-    if (out.length >= 5) break;
+    if (out.length >= 3) break;
   }
   return out;
 }
@@ -1036,13 +1048,17 @@ export async function runConciergeRecommendations(body) {
 
   const ageRange =
     typeof body.ageRange === "string" &&
-    ["under18", "18-24", "25-34", "35-44", "45+", "prefer_not"].includes(body.ageRange)
+    ["under18", "18-21", "18-24", "25-34", "35-44", "45+", "prefer_not"].includes(body.ageRange)
       ? body.ageRange
       : "prefer_not";
   const userAge =
     typeof body.userAge === "string" && body.userAge.trim()
       ? body.userAge.trim().slice(0, 8)
       : approximateAgeLabel(ageRange);
+
+  const transportMode = ["walking", "cycling", "transit", "driving"].includes(body.transportMode)
+    ? body.transportMode
+    : "driving";
 
   const swipeSignals =
     body.swipeSignals && typeof body.swipeSignals === "object" ? body.swipeSignals : null;
@@ -1134,6 +1150,7 @@ export async function runConciergeRecommendations(body) {
     nearbyPlacesAnnotated: nearbyPlaces,
     userAge,
     swipeSignals: swipeSignalsForModel,
+    transportMode,
     lat,
     lng,
     userContextLine,
@@ -1294,7 +1311,7 @@ export async function runConciergeAheadRecommendations(body) {
     : "any";
   const ageRange =
     typeof body.ageRange === "string" &&
-    ["under18", "18-24", "25-34", "35-44", "45+", "prefer_not"].includes(body.ageRange)
+    ["under18", "18-21", "18-24", "25-34", "35-44", "45+", "prefer_not"].includes(body.ageRange)
       ? body.ageRange
       : "prefer_not";
   const userAge =
