@@ -611,7 +611,7 @@ export default function HomeScreen() {
     // Show rejection reason chips briefly so the app can learn why
     if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
     setPendingRejection({ category: skippedCategory });
-    rejectionTimerRef.current = setTimeout(() => setPendingRejection(null), 4000);
+    rejectionTimerRef.current = setTimeout(() => setPendingRejection(null), 8000);
     setLeftDismissStreak((st) => {
       const n = st + 1;
       if (n >= 3) {
@@ -1160,36 +1160,36 @@ export default function HomeScreen() {
                 textInverse: colors.textInverse,
               }}
             />
-            {pendingRejection ? (
-              <View style={styles.rejectionRow}>
-                <Text style={styles.rejectionLabel}>Why not?</Text>
-                {(
-                  [
-                    { key: "too_far" as SkipReason, label: "Too far" },
-                    { key: "too_expensive" as SkipReason, label: "Too expensive" },
-                    { key: "not_today" as SkipReason, label: "Not today" },
-                    { key: "already_been" as SkipReason, label: "Already been" },
-                    { key: "not_my_thing" as SkipReason, label: "Not my thing" },
-                  ] as const
-                ).map(({ key, label }) => (
-                  <Pressable
-                    key={key}
-                    style={styles.rejectionChip}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      void recordSwipeSkipWithReason(pendingRejection.category, key);
-                      if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
-                      setPendingRejection(null);
-                    }}
-                  >
-                    <Text style={styles.rejectionChipText}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
           </View>
         </>
       )}
+      {pendingRejection ? (
+        <View style={styles.rejectionRow}>
+          <Text style={styles.rejectionLabel}>Why not?</Text>
+          {(
+            [
+              { key: "too_far" as SkipReason, label: "Too far" },
+              { key: "too_expensive" as SkipReason, label: "Too expensive" },
+              { key: "not_today" as SkipReason, label: "Not today" },
+              { key: "already_been" as SkipReason, label: "Already been" },
+              { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+            ] as const
+          ).map(({ key, label }) => (
+            <Pressable
+              key={key}
+              style={styles.rejectionChip}
+              onPress={() => {
+                Haptics.selectionAsync();
+                void recordSwipeSkipWithReason(pendingRejection.category, key);
+                if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
+                setPendingRejection(null);
+              }}
+            >
+              <Text style={styles.rejectionChipText}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       </>
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>

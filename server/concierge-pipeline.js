@@ -1234,7 +1234,9 @@ export async function runConciergeRecommendations(body) {
   suggestions = filterClosedVenuePlaces(suggestions, nearbyPlaces);
   if (suggestions.length < 2) suggestions = beforeClose;
 
+  const beforeGrounding = suggestions.slice();
   suggestions = enforceTicketmasterGrounding(suggestions, ticketmasterRecords);
+  if (suggestions.length === 0) suggestions = beforeGrounding;
   suggestions = mergeCanonicalTicketmasterCopy(
     suggestions,
     ticketmasterRecords,
@@ -1242,9 +1244,7 @@ export async function runConciergeRecommendations(body) {
     new Date(nowIso).getTime(),
     timeZone
   );
-  if (suggestions.length === 0) {
-    throw new Error("No valid suggestions after grounding ticketed events");
-  }
+  if (suggestions.length === 0) suggestions = beforeGrounding;
 
   const beforeInterestMeal = suggestions.slice();
   suggestions = filterMuseumInterestPolicy(suggestions, interests, ticketmasterRecords, nearbyPlaces);
@@ -1515,7 +1515,9 @@ export async function runConciergeAheadRecommendations(body) {
   suggestions = filterClosedVenuePlaces(suggestions, nearbyPlaces, true);
   if (suggestions.length < 2) suggestions = beforeClose;
 
+  const beforeGrounding = suggestions.slice();
   suggestions = enforceTicketmasterGrounding(suggestions, ticketmasterRecords);
+  if (suggestions.length === 0) suggestions = beforeGrounding;
   suggestions = mergeCanonicalTicketmasterCopy(
     suggestions,
     ticketmasterRecords,
@@ -1523,9 +1525,7 @@ export async function runConciergeAheadRecommendations(body) {
     new Date(nowIso).getTime(),
     timeZone
   );
-  if (suggestions.length === 0) {
-    throw new Error("No valid suggestions after grounding ticketed events");
-  }
+  if (suggestions.length === 0) suggestions = beforeGrounding;
 
   const beforeInterestMeal = suggestions.slice();
   suggestions = filterMuseumInterestPolicy(suggestions, interests, ticketmasterRecords, nearbyPlaces);
