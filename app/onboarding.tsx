@@ -413,13 +413,25 @@ function PersonalizedResponse({
 
       {/* Before / After cards */}
       <View style={pr.cards}>
+        {/* Before */}
         <View style={pr.card}>
-          <View style={pr.cardImg} />
+          <View style={pr.cardInner}>
+            <Text style={pr.cardEmoji}>📱</Text>
+            <Text style={pr.cardCopy}>Another night{"\n"}on the couch.</Text>
+          </View>
           <Text style={pr.cardLabel}>Before</Text>
         </View>
-        <View style={[pr.card, pr.cardAfter]}>
-          <View style={[pr.cardImg, pr.cardImgAfter]} />
-          <Text style={[pr.cardLabel, pr.cardLabelAfter]}>After</Text>
+
+        {/* After — peach glow behind it */}
+        <View style={pr.afterWrap}>
+          <View style={pr.afterGlow} />
+          <View style={[pr.card, pr.cardAfter]}>
+            <View style={pr.cardInner}>
+              <Text style={pr.cardEmoji}>🔥</Text>
+              <Text style={[pr.cardCopy, pr.cardCopyAfter]}>A night worth{"\n"}talking about.</Text>
+            </View>
+            <Text style={[pr.cardLabel, pr.cardLabelAfter]}>After</Text>
+          </View>
         </View>
       </View>
     </Shell>
@@ -430,31 +442,64 @@ const pr = StyleSheet.create({
   cards: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 32,
+    marginTop: 28,
+    flex: 1,
+  },
+  afterWrap: {
+    flex: 1,
+    position: "relative",
+  },
+  afterGlow: {
+    position: "absolute",
+    top: "20%",
+    left: "-15%",
+    right: "-15%",
+    bottom: "10%",
+    backgroundColor: PEACH,
+    opacity: 0.18,
+    borderRadius: 60,
+    // blur approximated with a large border radius spread
   },
   card: {
     flex: 1,
     borderRadius: 16,
-    overflow: "hidden",
     backgroundColor: CARD,
+    overflow: "hidden",
+    paddingBottom: 14,
   },
   cardAfter: {
-    backgroundColor: "#1E1A16",
+    backgroundColor: "#2C1810",
   },
-  cardImg: {
-    height: 140,
-    backgroundColor: "#252525",
+  cardInner: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 12,
   },
-  cardImgAfter: {
-    backgroundColor: "#2A2016",
+  cardEmoji: {
+    fontSize: 48,
+  },
+  cardCopy: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: MUTED_LIGHT,
+    textAlign: "center",
+    lineHeight: 17,
+  },
+  cardCopyAfter: {
+    color: PEACH,
   },
   cardLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     color: MUTED,
     textAlign: "center",
-    paddingVertical: 10,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    paddingBottom: 2,
   },
   cardLabelAfter: {
     color: PEACH,
