@@ -855,16 +855,34 @@ function buildGptUserPayload({
       next_close_time: p.nextCloseTime ?? null,
     }));
 
-  const nearby_events = (ticketmasterEvents || []).map((e) => ({
-    event_id: e.id,
-    name: e.name,
-    venue: e.venue,
-    start: e.startIso || `${e.localDate} ${e.localTime || ""}`.trim(),
-    when_label: e.whenLabel || "",
-    url: e.url,
-    price: e.priceLabel || "",
-    genre: e.genre,
-  }));
+  const nearby_events = (ticketmasterEvents || []).map((e) => {
+    let startLocal = "";
+    if (e.startIso) {
+      try {
+        startLocal = new Date(e.startIso).toLocaleString("en-US", {
+          timeZone,
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      } catch { /* fall through */ }
+    }
+    if (!startLocal && e.localDate) {
+      startLocal = `${e.localDate}${e.localTime ? " " + e.localTime : ""}`.trim();
+    }
+    return {
+      event_id: e.id,
+      name: e.name,
+      venue: e.venue,
+      start: startLocal,
+      when_label: e.whenLabel || "",
+      url: e.url,
+      price: e.priceLabel || "",
+      genre: e.genre,
+    };
+  });
 
   const hour = wall.hour24;
   const lateNight = hour >= 22 || hour < 6;
