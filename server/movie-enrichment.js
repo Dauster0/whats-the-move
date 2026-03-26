@@ -239,8 +239,85 @@ function fandangoSearchUrl(movieTitle, theaterHint) {
   return `https://www.fandango.com/search?q=${encodeURIComponent(q)}`;
 }
 
+async function enrichOneSuggestion(s, rawShowtimes, nearbyPlaces, ctx) {
+  const { timeZone, nowIso, areaLabel, energy, userContextLine } = ctx;
+
+  const place =
+    nearbyPlaces.find((p) => placeMatchesSuggestion(s.sourcePlaceName, p)) ||
+    nearbyPlaces.find((p) => placeMatchesSuggestion(s.mapQuery, p));
+  const theaterOk = Boolean(place && isMovieTheaterPlace(place));
+  const looksMovie =
+    theaterOk ||
+    /\bmovie\b|cinema|imax|theater|theatre|regal|amc|alamo|landmark/i.test(
+      `${s.title} ${s.description} ${s.sourcePlaceName}`
+    );
+
+  if (!theaterOk && !looksMovie) return s;
+  if (!theaterOk && looksMovie && !String(s.sourcePlaceName || "").trim()) return s;
+
+  const cinemaName = String(
+    theaterOk ? place.name : s.sourcePlaceName || s.venueName || ""
+  ).trim();
+  if (!cinemaName) return s;
+
+  const grouped = groupShowtimesForCinema(rawShowtimes, cinemaName);
+  if (!grouped.length) {
+    const u = fandangoSearchUrl(s.title, cinemaName);
+    return {
+      ...s,
+      kind: "movie",
+      theaterSubtitle: `Tonight at ${cinemaName}`,
+      ticketUrl: s.ticketUrl || u,
+      fandangoFallbackUrl: u,
+    };
+  }
+
+  // Run GPT pick and TMDB lookup in parallel where possible
+  const gptPick = await pickMovieWithGpt(grouped, { areaLabel, energy, userContextLine, timeZone, nowIso });
+  let chosen =
+    gptPick?.movieTitle && typeof gptPick.movieTitle === "string"
+      ? grouped.find((g) => g.movieTitle === gptPick.movieTitle)
+      : null;
+  if (!chosen) chosen = fallbackPick(grouped);
+  if (!chosen) return s;
+
+  const [tmdb] = await Promise.all([tmdbSearchMovie(chosen.movieTitle)]);
+  const pitch = String(gptPick?.pitch || "").trim();
+  const whyNow = String(gptPick?.whyNow || "").trim();
+  const pills = buildShowtimePills(chosen.slots, timeZone, nowIso);
+  const poster = tmdb?.posterUrl || s.photoUrl;
+  const description =
+    pitch ||
+    (tmdb?.overview ? String(tmdb.overview).slice(0, 280) : s.description);
+
+  return {
+    ...s,
+    kind: "movie",
+    title: chosen.movieTitle,
+    movieTitle: chosen.movieTitle,
+    venueName: cinemaName,
+    theaterSubtitle: `Tonight at ${cinemaName}`,
+    description,
+    whyNow: whyNow || "",
+    photoUrl: poster || s.photoUrl,
+    imageLayout: "poster",
+    photoSource: tmdb?.posterUrl ? "tmdb" : s.photoSource,
+    tmdbId: tmdb?.id || "",
+    tmdbRating: tmdb?.voteAverage ?? null,
+    runtimeMinutes: tmdb?.runtime ?? null,
+    movieGenres: tmdb?.genres?.length ? tmdb.genres.slice(0, 4) : [],
+    movieBackdropUrl: tmdb?.backdropUrl || "",
+    showtimes: pills,
+    mapQuery: `${cinemaName} ${areaLabel}`.trim() || s.mapQuery,
+    unsplashQuery: s.unsplashQuery || "movie theater neon lobby night",
+    ticketUrl: pills[0]?.bookingUrl || s.ticketUrl || fandangoSearchUrl(chosen.movieTitle, cinemaName),
+    fandangoFallbackUrl: fandangoSearchUrl(chosen.movieTitle, cinemaName),
+  };
+}
+
 /**
  * Enrich suggestions that reference a movie theater with real titles, showtimes, TMDB art.
+ * All suggestions are processed in parallel.
  */
 export async function enrichConciergeMovieSuggestions(suggestions, ctx) {
   const lat = ctx.lat;
@@ -255,99 +332,9 @@ export async function enrichConciergeMovieSuggestions(suggestions, ctx) {
   if (lat == null || lng == null) return suggestions;
 
   const rawShowtimes = await fetchShowtimesNearby(lat, lng);
-  const out = [];
+  const enrichCtx = { timeZone, nowIso, areaLabel, energy, userContextLine };
 
-  for (const s of suggestions) {
-    const place =
-      nearbyPlaces.find((p) => placeMatchesSuggestion(s.sourcePlaceName, p)) ||
-      nearbyPlaces.find((p) => placeMatchesSuggestion(s.mapQuery, p));
-    const theaterOk = Boolean(place && isMovieTheaterPlace(place));
-    const looksMovie =
-      theaterOk ||
-      /\bmovie\b|cinema|imax|theater|theatre|regal|amc|alamo|landmark/i.test(
-        `${s.title} ${s.description} ${s.sourcePlaceName}`
-      );
-
-    if (!theaterOk && !looksMovie) {
-      out.push(s);
-      continue;
-    }
-    if (!theaterOk && looksMovie && !String(s.sourcePlaceName || "").trim()) {
-      out.push(s);
-      continue;
-    }
-
-    const cinemaName = String(
-      theaterOk ? place.name : s.sourcePlaceName || s.venueName || ""
-    ).trim();
-    if (!cinemaName) {
-      out.push(s);
-      continue;
-    }
-
-    const grouped = groupShowtimesForCinema(rawShowtimes, cinemaName);
-    if (!grouped.length) {
-      const u = fandangoSearchUrl(s.title, cinemaName);
-      out.push({
-        ...s,
-        kind: "movie",
-        theaterSubtitle: `Tonight at ${cinemaName}`,
-        ticketUrl: s.ticketUrl || u,
-        fandangoFallbackUrl: u,
-      });
-      continue;
-    }
-
-    const gptPick = await pickMovieWithGpt(grouped, {
-      areaLabel,
-      energy,
-      userContextLine,
-      timeZone,
-      nowIso,
-    });
-    let chosen =
-      gptPick?.movieTitle && typeof gptPick.movieTitle === "string"
-        ? grouped.find((g) => g.movieTitle === gptPick.movieTitle)
-        : null;
-    if (!chosen) chosen = fallbackPick(grouped);
-    if (!chosen) {
-      out.push(s);
-      continue;
-    }
-
-    const pitch = String(gptPick?.pitch || "").trim();
-    const whyNow = String(gptPick?.whyNow || "").trim();
-    const tmdb = await tmdbSearchMovie(chosen.movieTitle);
-    const pills = buildShowtimePills(chosen.slots, timeZone, nowIso);
-    const poster = tmdb?.posterUrl || s.photoUrl;
-    const description =
-      pitch ||
-      (tmdb?.overview ? String(tmdb.overview).slice(0, 280) : s.description);
-
-    out.push({
-      ...s,
-      kind: "movie",
-      title: chosen.movieTitle,
-      movieTitle: chosen.movieTitle,
-      venueName: cinemaName,
-      theaterSubtitle: `Tonight at ${cinemaName}`,
-      description,
-      whyNow: whyNow || "",
-      photoUrl: poster || s.photoUrl,
-      imageLayout: "poster",
-      photoSource: tmdb?.posterUrl ? "tmdb" : s.photoSource,
-      tmdbId: tmdb?.id || "",
-      tmdbRating: tmdb?.voteAverage ?? null,
-      runtimeMinutes: tmdb?.runtime ?? null,
-      movieGenres: tmdb?.genres?.length ? tmdb.genres.slice(0, 4) : [],
-      movieBackdropUrl: tmdb?.backdropUrl || "",
-      showtimes: pills,
-      mapQuery: `${cinemaName} ${areaLabel}`.trim() || s.mapQuery,
-      unsplashQuery: s.unsplashQuery || "movie theater neon lobby night",
-      ticketUrl: pills[0]?.bookingUrl || s.ticketUrl || fandangoSearchUrl(chosen.movieTitle, cinemaName),
-      fandangoFallbackUrl: fandangoSearchUrl(chosen.movieTitle, cinemaName),
-    });
-  }
-
-  return out;
+  return Promise.all(
+    suggestions.map((s) => enrichOneSuggestion(s, rawShowtimes, nearbyPlaces, enrichCtx))
+  );
 }

@@ -127,7 +127,7 @@ async function ogImagePassesSizeProbe(imageUrl) {
       method: "HEAD",
       redirect: "follow",
       headers: { "User-Agent": "Mozilla/5.0 (compatible; WhatsTheMove/1.0)" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(3000),
     });
     if (!r.ok) return true;
     const ct = (r.headers.get("content-type") || "").toLowerCase();
@@ -150,7 +150,7 @@ export async function fetchOgImageUrl(websiteUrl) {
         "User-Agent": "Mozilla/5.0 (compatible; WhatsTheMove/1.0; +https://whats-the-move.app)",
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!r.ok) return null;
     const html = await r.text();
@@ -246,6 +246,119 @@ export function matchNearbyPlace(suggestion, nearbyPlaces) {
   return best;
 }
 
+async function resolveImageForSuggestion(suggestion, i, { lookup, nearbyPlaces, unsplashKey, seedBase, googleApiKey }) {
+  const s = { ...suggestion };
+  let photoUrl = null;
+  let imageLayout = "cover";
+  let photoSource = null;
+
+  const isGptKnowledge = String(s.sourceType || "").toLowerCase() === "gpt_knowledge";
+  if (isGptKnowledge && unsplashKey) {
+    const q = String(s.unsplashQuery || "").trim();
+    const fallbacks = [q || `${s.title} los angeles neighborhood atmosphere`, "city afternoon street life warm light"];
+    try {
+      const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+        maxImages: 1,
+        seed: `${seedBase}-${i}-gk`,
+        minPhotoWidth: MIN_PIXEL_WIDTH,
+      });
+      if (urls[0]) {
+        photoUrl = urls[0];
+        photoSource = "unsplash";
+        imageLayout = "cover";
+      }
+    } catch {
+      /* keep null */
+    }
+    s.photoUrl = photoUrl;
+    s.imageLayout = imageLayout;
+    s.photoSource = photoSource;
+    return s;
+  }
+
+  const tmRecord = resolveTicketmasterRecord(s, lookup);
+  const ticketed = isTicketedEventSuggestion(s);
+  const place = !ticketed ? matchNearbyPlace(s, nearbyPlaces) : null;
+
+  if (tmRecord) {
+    const tmUrl = pickTicketmasterCardImage(tmRecord);
+    if (tmUrl) {
+      photoUrl = tmUrl;
+      imageLayout = "poster";
+      photoSource = "ticketmaster";
+    }
+  }
+
+  if (!photoUrl && ticketed && unsplashKey) {
+    const q = String(s.unsplashQuery || "").trim();
+    const fallbacks = [q || `${s.title} live show atmosphere`, "concert stage lights crowd night energy"];
+    try {
+      const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
+        maxImages: 1,
+        seed: `${seedBase}-${i}-t`,
+        minPhotoWidth: MIN_PIXEL_WIDTH,
+      });
+      if (urls[0]) {
+        photoUrl = urls[0];
+        photoSource = "unsplash";
+        imageLayout = "cover";
+      }
+    } catch {
+      /* keep null */
+    }
+  }
+
+  if (!photoUrl && !ticketed) {
+    const fallbacks = [
+      String(s.unsplashQuery || "").trim() || `${s.category || "night out"} mood atmosphere`,
+      "friends evening out warm cinematic light",
+    ];
+    if (place?.websiteUri) {
+      const og = await fetchOgImageUrl(place.websiteUri);
+      if (og && !(await isImageTopRegionPredominantlyWhite(og))) {
+        photoUrl = og;
+        photoSource = "website";
+      }
+    }
+    if (!photoUrl && unsplashKey) {
+      const kq = koreanBbqUnsplashQuery(s);
+      const fb = [kq, ...fallbacks].filter(Boolean);
+      try {
+        const { urls } = await fetchUnsplashEditorial(unsplashKey, fb, {
+          maxImages: 1,
+          seed: `${seedBase}-${i}-p`,
+          minPhotoWidth: MIN_PIXEL_WIDTH,
+        });
+        if (urls[0]) {
+          photoUrl = urls[0];
+          photoSource = "unsplash";
+        }
+      } catch {
+        /* keep null */
+      }
+    }
+    if (!photoUrl && place && googleApiKey) {
+      const names = pickPlacePhotoNames(place.photos);
+      for (const pname of names) {
+        const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1920);
+        if (!u) continue;
+        if (await isImageTopRegionPredominantlyWhite(u)) continue;
+        photoUrl = u;
+        photoSource = "google_places";
+        break;
+      }
+    }
+  }
+
+  s.photoUrl = photoUrl;
+  s.imageLayout = imageLayout;
+  s.photoSource = photoSource;
+  if (place?.resourceName) {
+    s.googlePlaceResourceName = String(place.resourceName).trim();
+  }
+  return s;
+}
+
 export async function resolveConciergeSuggestionImages({
   suggestions,
   ticketmasterRecords,
@@ -255,119 +368,6 @@ export async function resolveConciergeSuggestionImages({
   googleApiKey,
 }) {
   const lookup = buildTicketmasterLookup(ticketmasterRecords);
-
-  const enriched = [];
-  for (let i = 0; i < suggestions.length; i++) {
-    const s = { ...suggestions[i] };
-    let photoUrl = null;
-    let imageLayout = "cover";
-    let photoSource = null;
-
-    const isGptKnowledge = String(s.sourceType || "").toLowerCase() === "gpt_knowledge";
-    if (isGptKnowledge && unsplashKey) {
-      const q = String(s.unsplashQuery || "").trim();
-      const fallbacks = [q || `${s.title} los angeles neighborhood atmosphere`, "city afternoon street life warm light"];
-      try {
-        const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
-          maxImages: 1,
-          seed: `${seedBase}-${i}-gk`,
-          minPhotoWidth: MIN_PIXEL_WIDTH,
-        });
-        if (urls[0]) {
-          photoUrl = urls[0];
-          photoSource = "unsplash";
-          imageLayout = "cover";
-        }
-      } catch {
-        /* keep null */
-      }
-      s.photoUrl = photoUrl;
-      s.imageLayout = imageLayout;
-      s.photoSource = photoSource;
-      enriched.push(s);
-      continue;
-    }
-
-    const tmRecord = resolveTicketmasterRecord(s, lookup);
-    const ticketed = isTicketedEventSuggestion(s);
-    const place = !ticketed ? matchNearbyPlace(s, nearbyPlaces) : null;
-
-    if (tmRecord) {
-      const tmUrl = pickTicketmasterCardImage(tmRecord);
-      if (tmUrl) {
-        photoUrl = tmUrl;
-        imageLayout = "poster";
-        photoSource = "ticketmaster";
-      }
-    }
-
-    if (!photoUrl && ticketed && unsplashKey) {
-      const q = String(s.unsplashQuery || "").trim();
-      const fallbacks = [q || `${s.title} live show atmosphere`, "concert stage lights crowd night energy"];
-      try {
-        const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {
-          maxImages: 1,
-          seed: `${seedBase}-${i}-t`,
-          minPhotoWidth: MIN_PIXEL_WIDTH,
-        });
-        if (urls[0]) {
-          photoUrl = urls[0];
-          photoSource = "unsplash";
-          imageLayout = "cover";
-        }
-      } catch {
-        /* keep null */
-      }
-    }
-
-    if (!photoUrl && !ticketed) {
-      const q = String(s.unsplashQuery || "").trim();
-      const fallbacks = [q || `${s.category || "night out"} mood atmosphere`, "friends evening out warm cinematic light"];
-      if (!photoUrl && place?.websiteUri) {
-        const og = await fetchOgImageUrl(place.websiteUri);
-        if (og && !(await isImageTopRegionPredominantlyWhite(og))) {
-          photoUrl = og;
-          photoSource = "website";
-        }
-      }
-      if (!photoUrl && unsplashKey) {
-        const kq = koreanBbqUnsplashQuery(s);
-        const fb = [kq, ...fallbacks].filter(Boolean);
-        try {
-          const { urls } = await fetchUnsplashEditorial(unsplashKey, fb, {
-            maxImages: 1,
-            seed: `${seedBase}-${i}-p`,
-            minPhotoWidth: MIN_PIXEL_WIDTH,
-          });
-          if (urls[0]) {
-            photoUrl = urls[0];
-            photoSource = "unsplash";
-          }
-        } catch {
-          /* keep null */
-        }
-      }
-      if (!photoUrl && place && googleApiKey) {
-        const names = pickPlacePhotoNames(place.photos);
-        for (const pname of names) {
-          const u = googlePlacePhotoMediaUrl(pname, googleApiKey, 1920);
-          if (!u) continue;
-          if (await isImageTopRegionPredominantlyWhite(u)) continue;
-          photoUrl = u;
-          photoSource = "google_places";
-          break;
-        }
-      }
-    }
-
-    s.photoUrl = photoUrl;
-    s.imageLayout = imageLayout;
-    s.photoSource = photoSource;
-    if (place?.resourceName) {
-      s.googlePlaceResourceName = String(place.resourceName).trim();
-    }
-    enriched.push(s);
-  }
-
-  return enriched;
+  const ctx = { lookup, nearbyPlaces, unsplashKey, seedBase, googleApiKey };
+  return Promise.all(suggestions.map((s, i) => resolveImageForSuggestion(s, i, ctx)));
 }

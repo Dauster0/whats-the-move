@@ -24,7 +24,7 @@ export async function isImageTopRegionPredominantlyWhite(imageUrl) {
   if (!url.startsWith("http")) return false;
   try {
     const r = await fetch(url, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(4000),
       headers: { "User-Agent": "Mozilla/5.0 (compatible; WhatsTheMove/1.0)" },
     });
     if (!r.ok) return false;
