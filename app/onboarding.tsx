@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -27,6 +28,8 @@ const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
 const TOTAL_STEPS = 17;
+const DECK_CARD_H = 170; // height of each preview card
+const DECK_PEEK = 22;    // how many px of each back card peek below the front
 
 // ─── Shared Shell ────────────────────────────────────────────────────────────
 
@@ -196,13 +199,44 @@ const sh = StyleSheet.create({
 
 // ─── Screen 1 — Splash ───────────────────────────────────────────────────────
 
+function SplashDeckCard({
+  gradient,
+  category,
+  title,
+  description,
+  tags,
+  style,
+}: {
+  gradient: readonly [string, string, ...string[]];
+  category: string;
+  title: string;
+  description: string;
+  tags: string[];
+  style?: object;
+}) {
+  return (
+    <View style={[sp.dc, style]}>
+      <LinearGradient colors={gradient} style={sp.dcImage}>
+        <Text style={sp.dcCat}>{category}</Text>
+      </LinearGradient>
+      <View style={sp.dcBody}>
+        <Text style={sp.dcTitle}>{title}</Text>
+        <Text style={sp.dcDesc} numberOfLines={2}>{description}</Text>
+        <View style={sp.dcTags}>
+          {tags.map((t) => <Text key={t} style={sp.dcTag}>{t}</Text>)}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function Splash({ onContinue }: { onContinue: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={sp.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* 1 — Headline at top */}
+      {/* 1 — Headline */}
       <View style={[sp.upper, { paddingTop: insets.top + 24 }]}>
         <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
         <Text style={sp.headline}>
@@ -212,44 +246,39 @@ function Splash({ onContinue }: { onContinue: () => void }) {
           {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
         </Text>
 
-        {/* 2 — Move cards in the middle */}
+        {/* 2 — Deck preview */}
         <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
-        <View style={sp.stack}>
-          <View style={sp.card}>
-            <View style={[sp.imageZone, { backgroundColor: "#0d1526" }]}>
-              <Text style={sp.emoji}>🎵</Text>
-              <Text style={sp.category}>LIVE MUSIC</Text>
-            </View>
-            <View style={sp.cardBody}>
-              <Text style={sp.cardTitle}>Clairo at The Wiltern</Text>
-              <View style={sp.tagRow}><Text style={sp.tag}>Tonight</Text><Text style={sp.tag}>9 PM</Text></View>
-            </View>
-          </View>
-          <View style={sp.card}>
-            <View style={[sp.imageZone, { backgroundColor: "#3d2918" }]}>
-              <Text style={sp.emoji}>🌮</Text>
-              <Text style={sp.category}>FOOD & DRINK</Text>
-            </View>
-            <View style={sp.cardBody}>
-              <Text style={sp.cardTitle}>Best birria in Koreatown</Text>
-              <View style={sp.tagRow}><Text style={sp.tag}>Open now</Text></View>
-            </View>
-          </View>
-          <View style={sp.card}>
-            <View style={[sp.imageZone, { backgroundColor: "#14261c" }]}>
-              <Text style={sp.emoji}>🔭</Text>
-              <Text style={sp.category}>OUTDOOR</Text>
-            </View>
-            <View style={sp.cardBody}>
-              <Text style={sp.cardTitle}>Meteor shower at Griffith</Text>
-              <View style={sp.tagRow}><Text style={sp.tag}>11 PM</Text><Text style={sp.tag}>Tonight</Text></View>
-            </View>
-          </View>
+        {/* Cards rendered back → front so front card (Clairo) is on top */}
+        <View style={sp.deckWrap}>
+          <SplashDeckCard
+            gradient={["#0d2620", "#061a12"]}
+            category="EXPERIENCE"
+            title="Meteor Shower at Griffith"
+            description="Peaks at 11pm, free, rare"
+            tags={["Tonight 11PM", "low"]}
+            style={{ top: DECK_PEEK * 2, zIndex: 1 }}
+          />
+          <SplashDeckCard
+            gradient={["#3d1e08", "#1a0a02"]}
+            category="EAT"
+            title="Best Birria in Koreatown"
+            description="Open until 3am, cash only, worth it"
+            tags={["Open now", "45 min"]}
+            style={{ top: DECK_PEEK, zIndex: 2 }}
+          />
+          <SplashDeckCard
+            gradient={["#0d1526", "#1a0d3d"]}
+            category="EVENT"
+            title="Clairo at The Wiltern"
+            description="Indie pop — small venue, intimate show"
+            tags={["Tonight 9PM", "2 hours"]}
+            style={{ top: 0, zIndex: 3 }}
+          />
         </View>
       </View>
 
       {/* 3 — Button pinned to bottom */}
-      <View style={[sp.card, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
+      <View style={[sp.bottom, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
         <Pressable onPress={onContinue} style={sp.btn} activeOpacity={0.85}>
           <Text style={sp.btnText}>Show me what's out there →</Text>
         </Pressable>
@@ -268,75 +297,11 @@ const sp = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  previewLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: PEACH,
-    letterSpacing: 1.4,
-    marginBottom: 10,
-  },
-  stack: {
-    gap: 10,
-  },
-  card: {
-    backgroundColor: "#161412",
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  imageZone: {
-    height: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  emoji: {
-    fontSize: 20,
-  },
-  category: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  cardBody: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: WHITE,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  tagRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  tag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.75)",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    overflow: "hidden",
-  },
   eyebrow: {
     fontSize: 10,
     fontWeight: "700",
     color: PEACH,
     letterSpacing: 1.4,
-  },
-  card: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
   },
   headline: {
     fontSize: 36,
@@ -351,7 +316,86 @@ const sp = StyleSheet.create({
     fontSize: 15,
     color: MUTED_LIGHT,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  previewLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: PEACH,
+    letterSpacing: 1.4,
+    marginBottom: 12,
+  },
+  // Deck container — fixed height so cards can stack via absolute position
+  deckWrap: {
+    position: "relative",
+    height: DECK_CARD_H + DECK_PEEK * 2,
+  },
+  // Each deck card — absolutely positioned inside deckWrap
+  dc: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: DECK_CARD_H,
+    backgroundColor: "#161412",
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  dcImage: {
+    height: DECK_CARD_H * 0.52,
+    justifyContent: "flex-end",
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  dcCat: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 1.3,
+    textTransform: "uppercase",
+  },
+  dcBody: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  dcTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: WHITE,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  dcDesc: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.6)",
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  dcTags: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  dcTag: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  bottom: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
   },
   btn: {
     backgroundColor: PEACH,
