@@ -54,6 +54,8 @@ export type ConciergeSuggestion = {
   movieBackdropUrl?: string;
   showtimes?: ConciergeShowtimePill[];
   fandangoFallbackUrl?: string;
+  /** Coming Up tab / planning — short date label on card */
+  dateBadge?: string;
 };
 
 

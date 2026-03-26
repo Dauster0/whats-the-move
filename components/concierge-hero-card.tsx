@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -88,6 +89,9 @@ type Props = {
   imageGradientBottomColor?: string;
   onBookmarkPress?: () => void;
   bookmarkSaved?: boolean;
+  /** Free tier: wildcard slot is visible but locked. */
+  wildcardLocked?: boolean;
+  onLockedWildcardPress?: () => void;
 };
 
 export function ConciergeHeroCard({
@@ -102,6 +106,8 @@ export function ConciergeHeroCard({
   imageGradientBottomColor = "#161412",
   onBookmarkPress,
   bookmarkSaved,
+  wildcardLocked,
+  onLockedWildcardPress,
 }: Props) {
   const pad = spacing.md;
   const innerW = width - pad * 2;
@@ -175,20 +181,64 @@ export function ConciergeHeroCard({
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
+      {wildcardLocked ? (
+        <View style={styles.lockOverlay} pointerEvents="none">
+          <View style={styles.lockCircle}>
+            <Ionicons name="lock-closed" size={26} color="rgba(255,255,255,0.95)" />
+          </View>
+        </View>
+      ) : null}
       {swipeMode ? (
         <View style={styles.imageCategoryRow} pointerEvents="none">
-          {s.closesSoon ? (
+          {wildcardLocked ? (
+            <Text style={styles.imageCategory}>Wildcard</Text>
+          ) : null}
+          {!wildcardLocked && s.dateBadge ? (
+            <View style={styles.dateBadgePill}>
+              <Text style={styles.dateBadgeText}>{s.dateBadge}</Text>
+            </View>
+          ) : null}
+          {!wildcardLocked && s.closesSoon ? (
             <View style={styles.closesSoonPill}>
               <Text style={styles.closesSoonText}>Closes soon</Text>
             </View>
           ) : null}
-          <Text style={styles.imageCategory}>{s.category}</Text>
+          {!wildcardLocked ? <Text style={styles.imageCategory}>{s.category}</Text> : null}
         </View>
       ) : null}
     </View>
   );
 
-  const textBodyInner = (
+  const lockedSwipeBody = (
+    <>
+      <Text style={styles.wildcardLockedTitle} numberOfLines={4}>
+        Something rare is happening near you tonight.
+      </Text>
+      <View style={styles.blurDescriptionWrap}>
+        <Text style={[styles.description, styles.descriptionSwipe, styles.blurSourceText]} numberOfLines={5}>
+          {displayDescription}
+        </Text>
+        <BlurView intensity={55} tint="dark" style={styles.blurAbsolute} />
+      </View>
+      <Pressable
+        style={[styles.unlockCta, { borderColor: colors.accent + "88" }]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onLockedWildcardPress?.();
+        }}
+      >
+        <Text style={[styles.unlockCtaText, { color: colors.accent }]}>Unlock with Plus</Text>
+        <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
+      </Pressable>
+      <View style={styles.tagRow}>
+        <Text style={styles.tag}>Plus</Text>
+      </View>
+    </>
+  );
+
+  const textBodyInner = wildcardLocked && swipeMode ? (
+    lockedSwipeBody
+  ) : (
     <>
       {why && !swipeMode ? (
         <View style={[styles.whyBlock, { borderLeftColor: colors.accent }]}>
@@ -263,6 +313,9 @@ export function ConciergeHeroCard({
 
   const footerBlock = (
     <View style={[styles.textPanelFooter, swipeMode && styles.textPanelFooterSwipe]}>
+      {swipeMode && wildcardLocked ? (
+        <Text style={styles.swipeHintFooter}>Swipe left to skip · swipe right to see Plus</Text>
+      ) : null}
       {swipeMode ? null : ticketed ? (
         <View style={styles.ctaRow}>
           <Pressable
@@ -299,7 +352,7 @@ export function ConciergeHeroCard({
         </Pressable>
       )}
       {swipeMode && isMovie && s.showtimes?.length ? (
-        <Text style={styles.swipeHintFooter}>Tap a time to book · swipe right for full detail</Text>
+        <Text style={styles.swipeHintFooter}>Tap a time to book · tap card for details · swipe right if you’re going</Text>
       ) : null}
     </View>
   );
@@ -317,7 +370,7 @@ export function ConciergeHeroCard({
         ]}
       >
         <View style={styles.column}>
-          {onBookmarkPress ? (
+          {onBookmarkPress && !wildcardLocked ? (
             <Pressable
               style={[styles.bookmarkHit, { backgroundColor: "rgba(0,0,0,0.45)" }]}
               onPress={() => {
@@ -335,9 +388,11 @@ export function ConciergeHeroCard({
           ) : null}
           <>
             <Pressable
-              disabled={!onCardPress}
-              onPress={onCardPress}
-              style={({ pressed }) => [pressed && onCardPress ? { opacity: 0.98 } : null]}
+              disabled={!onCardPress && !wildcardLocked}
+              onPress={wildcardLocked ? onLockedWildcardPress : onCardPress}
+              style={({ pressed }) => [
+                pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+              ]}
             >
               {imageBlock}
               <View style={[styles.textBody, swipeMode && styles.textBodySwipe]}>{textBodyInner}</View>
@@ -381,6 +436,60 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 6,
+  },
+  lockCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wildcardLockedTitle: {
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.3,
+    marginBottom: spacing.sm,
+  },
+  blurDescriptionWrap: {
+    position: "relative",
+    minHeight: 96,
+    borderRadius: radius.sm,
+    overflow: "hidden",
+    marginBottom: spacing.md,
+  },
+  blurSourceText: {
+    opacity: 0.22,
+    paddingHorizontal: 2,
+  },
+  blurAbsolute: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  unlockCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    alignSelf: "stretch",
+    marginBottom: spacing.sm,
+  },
+  unlockCtaText: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
   posterStage: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#070708",
@@ -411,6 +520,21 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.45)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  dateBadgePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(15,23,42,0.88)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  dateBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.95)",
+    letterSpacing: 0.3,
   },
   closesSoonPill: {
     alignSelf: "flex-start",

@@ -3,7 +3,8 @@ import type { ConciergeSuggestion } from "./concierge-types";
 import { recordSwipeBookmark } from "./swipe-signals-storage";
 
 const KEY = "@concierge/saved-moves-v1";
-const MAX = 40;
+export const FREE_SAVED_MOVES_CAP = 10;
+const PLUS_SAVED_CAP = 500;
 
 export type SavedConciergeMove = {
   id: string;
@@ -27,14 +28,18 @@ export async function getSavedConciergeMoves(): Promise<SavedConciergeMove[]> {
   }
 }
 
-export async function saveConciergeMove(suggestion: ConciergeSuggestion): Promise<boolean> {
+export async function saveConciergeMove(
+  suggestion: ConciergeSuggestion,
+  maxSlots: number = PLUS_SAVED_CAP
+): Promise<boolean> {
   const id = stableId(suggestion);
   const existing = await getSavedConciergeMoves();
   if (existing.some((x) => x.id === id)) return false;
+  if (existing.length >= maxSlots) return false;
   const next: SavedConciergeMove[] = [
     { id, savedAt: new Date().toISOString(), suggestion },
     ...existing.filter((x) => x.id !== id),
-  ].slice(0, MAX);
+  ].slice(0, maxSlots);
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
   void recordSwipeBookmark(suggestion.category || "experience");
   return true;
@@ -54,15 +59,24 @@ export async function isConciergeMoveSaved(suggestion: ConciergeSuggestion): Pro
   return existing.some((x) => x.id === id);
 }
 
-/** Returns true if saved after toggle, false if removed. */
+export type ToggleSaveResult = { saved: boolean; blockedCap?: boolean };
+
+/** Returns saved state after toggle. Respects max saves for free tier. */
 export async function toggleSavedConciergeMove(
-  suggestion: ConciergeSuggestion
-): Promise<boolean> {
+  suggestion: ConciergeSuggestion,
+  options?: { plusUnlimited?: boolean }
+): Promise<ToggleSaveResult> {
+  const maxSlots = options?.plusUnlimited ? PLUS_SAVED_CAP : FREE_SAVED_MOVES_CAP;
   const id = stableId(suggestion);
   const existing = await getSavedConciergeMoves();
   if (existing.some((x) => x.id === id)) {
     await removeSavedConciergeMove(id);
-    return false;
+    return { saved: false };
   }
-  return await saveConciergeMove(suggestion);
+  if (existing.length >= maxSlots) {
+    return { saved: false, blockedCap: true };
+  }
+  const ok = await saveConciergeMove(suggestion, maxSlots);
+  if (!ok) return { saved: false, blockedCap: true };
+  return { saved: true };
 }

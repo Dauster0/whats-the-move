@@ -205,6 +205,7 @@ const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "flex-end",
+    overflow: "hidden",
   },
   cardSlot: {
     position: "absolute",

@@ -1,34 +1,12 @@
-/** Single list for onboarding + edit-interests — keys stored in `UserPreferences.interests`. */
+import interestData from "./interest-data.json";
+
 export type InterestChip = { key: string; label: string };
 
-export const USER_INTEREST_CHIPS: InterestChip[] = [
-  { key: "walking", label: "Walking" },
-  { key: "hikes", label: "Hikes & trails" },
-  { key: "coffee", label: "Coffee" },
-  { key: "dessert", label: "Dessert" },
-  { key: "exploring", label: "Exploring" },
-  { key: "bookstores", label: "Bookstores" },
-  { key: "museums", label: "Museums" },
-  { key: "movies", label: "Movies" },
-  { key: "theater", label: "Theater & plays" },
-  { key: "live-music", label: "Live music" },
-  { key: "concerts", label: "Concerts" },
-  { key: "comedy", label: "Comedy" },
-  { key: "improv", label: "Improv" },
-  { key: "karaoke", label: "Karaoke" },
-  { key: "dancing", label: "Dancing" },
-  { key: "trivia", label: "Trivia nights" },
-  { key: "nightlife", label: "Nightlife" },
-  { key: "sports", label: "Sports" },
-  { key: "bowling", label: "Bowling" },
-  { key: "arcade", label: "Arcade" },
-  { key: "farmers-markets", label: "Farmers markets" },
-  { key: "rooftops", label: "Rooftops" },
-  { key: "working out", label: "Working out" },
-  { key: "beach", label: "Beach" },
-  { key: "journaling", label: "Journaling" },
-  { key: "reading", label: "Reading" },
-  { key: "calling friends", label: "Calling friends" },
-  { key: "solo-recharge", label: "Solo recharge" },
-  { key: "cheap-hangouts", label: "Cheap hangouts" },
-];
+export type InterestSection = { title: string; items: InterestChip[] };
+
+const data = interestData as { sections: InterestSection[] };
+
+export const USER_INTEREST_SECTIONS: InterestSection[] = data.sections;
+
+/** Flat list for APIs and legacy callers. */
+export const USER_INTEREST_CHIPS: InterestChip[] = data.sections.flatMap((s) => s.items);

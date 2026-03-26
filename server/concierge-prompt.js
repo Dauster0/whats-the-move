@@ -12,6 +12,9 @@ INTERESTS (mandatory — read positive_interests and not_interested_in in the us
 - If you suggest anything outside positive_interests, you MUST set whyNow to a concrete one-line reason tying it to an interest they actually have (not generic filler). If you cannot justify it, omit that pick.
 - Museum and art-gallery venues are excluded from nearby_places when "museums" is not in positive_interests — do not invent museum visits from thin air.
 
+DECAY / HISTORY (when decay_recent_venues appears in the user JSON — array of place or event names):
+- The user has recently seen, skipped, or rejected these specific venues or shows. Do NOT suggest any of them again in this deck. Prefer fresh picks they have not been shown.
+
 DECK CATEGORY FOCUS (when deck_category_focus appears in the JSON):
 - The user tapped a chip to bias this deck. Prioritize that theme across several cards while still outputting all five deck_role slots.
 

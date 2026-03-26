@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,6 +27,8 @@ import {
   setConciergeDetailPayload,
   type ConciergeDetailPayload,
 } from "../lib/concierge-detail-storage";
+import { getPeekDetailHandlers, setPeekDetailHandlers } from "../lib/peek-detail-handlers";
+import { recordDecayNeverShow } from "../lib/suggestion-decay-storage";
 import { takeCachedConciergeQuick } from "../lib/concierge-quick-cache";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
 import { font, radius, spacing } from "../lib/theme";
@@ -35,6 +37,7 @@ import {
   isConciergeMoveSaved,
   toggleSavedConciergeMove,
 } from "../lib/saved-concierge-storage";
+import { usePlusEntitlements } from "../store/plus-context";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.154:3001";
 const { width: WIN_W } = Dimensions.get("window");
@@ -103,6 +106,7 @@ function pickSimilar(others: ConciergeSuggestion[], current: ConciergeSuggestion
 export default function ConciergeDetailScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { isPlus } = usePlusEntitlements();
   const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   const [payload, setPayload] = useState<ConciergeDetailPayload | null>(null);
@@ -221,7 +225,12 @@ export default function ConciergeDetailScreen() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    return () => setPeekDetailHandlers(null);
+  }, []);
+
   const suggestion = payload?.suggestion;
+  const isPeek = Boolean(payload?.peek);
 
   useEffect(() => {
     if (!suggestion) return;
@@ -289,8 +298,12 @@ export default function ConciergeDetailScreen() {
   async function onToggleSave() {
     if (!suggestion) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const next = await toggleSavedConciergeMove(suggestion);
-    setSaved(next);
+    const res = await toggleSavedConciergeMove(suggestion, { plusUnlimited: isPlus });
+    if (res.blockedCap) {
+      router.push("/elsewhere-plus?source=saved_cap" as Href);
+      return;
+    }
+    setSaved(res.saved);
   }
 
   return (
@@ -569,6 +582,7 @@ export default function ConciergeDetailScreen() {
                       await setConciergeDetailPayload({
                         suggestion: s,
                         others: (payload?.others || []).filter((x) => x.title !== s.title),
+                        peek: payload?.peek,
                       });
                       setHeroIdx(0);
                       setDetail(null);
@@ -600,24 +614,72 @@ export default function ConciergeDetailScreen() {
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <Pressable
-          style={[
-            styles.bottomCta,
-            { backgroundColor: colors.accent },
-            showFullSkeleton ? { opacity: 0.45 } : null,
-          ]}
-          disabled={showFullSkeleton}
-          onPress={onPrimaryCta}
-        >
-          <Text style={[styles.bottomCtaText, { color: colors.textInverse }]}>
-            {primary?.label || "Get directions"}
-          </Text>
-          <Ionicons
-            name={primary?.action === "tickets" ? "ticket-outline" : "map-outline"}
-            size={20}
-            color={colors.textInverse}
-          />
-        </Pressable>
+        {isPeek && suggestion ? (
+          <>
+            <View style={styles.peekRow}>
+              <Pressable
+                style={[styles.peekBtnNah, { borderColor: colors.border, backgroundColor: colors.bgCard }]}
+                disabled={showFullSkeleton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  void clearConciergeDetailPayload();
+                  getPeekDetailHandlers()?.onNah();
+                }}
+              >
+                <Text style={[styles.peekBtnNahText, { color: colors.text }]}>✕ Not for me</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.peekBtnGo,
+                  { backgroundColor: colors.accent },
+                  showFullSkeleton ? { opacity: 0.45 } : null,
+                ]}
+                disabled={showFullSkeleton}
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  void clearConciergeDetailPayload();
+                  getPeekDetailHandlers()?.onCommit();
+                }}
+              >
+                <Text style={[styles.peekBtnGoText, { color: colors.textInverse }]}>✓ I’m going</Text>
+              </Pressable>
+            </View>
+            <Pressable
+              style={styles.neverShowBtn}
+              hitSlop={8}
+              onPress={() => {
+                void (async () => {
+                  await recordDecayNeverShow(suggestion);
+                  void clearConciergeDetailPayload();
+                  const h = getPeekDetailHandlers();
+                  if (h?.onNeverShow) h.onNeverShow();
+                  else router.back();
+                })();
+              }}
+            >
+              <Text style={[styles.neverShowText, { color: colors.textMuted }]}>Don’t show again</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            style={[
+              styles.bottomCta,
+              { backgroundColor: colors.accent },
+              showFullSkeleton ? { opacity: 0.45 } : null,
+            ]}
+            disabled={showFullSkeleton}
+            onPress={onPrimaryCta}
+          >
+            <Text style={[styles.bottomCtaText, { color: colors.textInverse }]}>
+              {primary?.label || "Get directions"}
+            </Text>
+            <Ionicons
+              name={primary?.action === "tickets" ? "ticket-outline" : "map-outline"}
+              size={20}
+              color={colors.textInverse}
+            />
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -812,6 +874,30 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
       borderRadius: radius.md,
     },
     bottomCtaText: { fontSize: 17, fontWeight: "800" },
+    peekRow: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "stretch",
+    },
+    peekBtnNah: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 16,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+    peekBtnNahText: { fontSize: 16, fontWeight: "800" },
+    peekBtnGo: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 16,
+      borderRadius: radius.md,
+    },
+    peekBtnGoText: { fontSize: 16, fontWeight: "800" },
+    neverShowBtn: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
+    neverShowText: { fontSize: 13, fontWeight: "600" },
     backBtn: { marginTop: spacing.md, padding: 12 },
     backBtnText: { fontWeight: "700", color: colors.accent },
   });

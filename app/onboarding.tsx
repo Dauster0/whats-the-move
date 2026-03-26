@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import { font, radius, spacing } from "../lib/theme";
-import { USER_INTEREST_CHIPS } from "../lib/user-interests";
+import { USER_INTEREST_SECTIONS } from "../lib/user-interests";
 import { UserPreferences, useMoveStore } from "../store/move-context";
 
 const STEPS = [
@@ -97,24 +97,29 @@ export default function OnboardingScreen() {
           <Text style={styles.subtitle}>
             What would you actually say yes to this week?
           </Text>
-          <View style={styles.chipGrid}>
-            {USER_INTEREST_CHIPS.map(({ key, label }) => {
-              const active = preferences.interests.includes(key);
-              return (
-                <Pressable
-                  key={key}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => toggleInterest(key)}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {USER_INTEREST_SECTIONS.map((section) => (
+            <View key={section.title} style={styles.interestSection}>
+              <Text style={styles.interestSectionTitle}>{section.title}</Text>
+              <View style={styles.chipGrid}>
+                {section.items.map(({ key, label }) => {
+                  const active = preferences.interests.includes(key);
+                  return (
+                    <Pressable
+                      key={key}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => toggleInterest(key)}
+                    >
+                      <Text
+                        style={[styles.chipText, active && styles.chipTextActive]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
         </>
       )}
 
@@ -345,6 +350,17 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
     lineHeight: 23,
     color: colors.textSub,
     marginBottom: spacing.lg,
+  },
+  interestSection: {
+    marginBottom: spacing.lg,
+  },
+  interestSectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.textMuted,
+    marginBottom: 10,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   chipGrid: {
     flexDirection: "row",

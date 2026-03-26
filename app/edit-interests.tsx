@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, font, radius, spacing } from "../lib/theme";
-import { USER_INTEREST_CHIPS } from "../lib/user-interests";
+import { USER_INTEREST_SECTIONS } from "../lib/user-interests";
 import { useMoveStore } from "../store/move-context";
 
 export default function EditInterestsScreen() {
@@ -40,23 +40,27 @@ export default function EditInterestsScreen() {
         Pick what you’d really leave the house for.
       </Text>
 
-      <View style={styles.chipGrid}>
-        {USER_INTEREST_CHIPS.map((interest) => {
-          const active = selected.includes(interest.key);
-
-          return (
-            <Pressable
-              key={interest.key}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => toggleInterest(interest.key)}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {interest.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {USER_INTEREST_SECTIONS.map((section) => (
+        <View key={section.title} style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>{section.title}</Text>
+          <View style={styles.chipGrid}>
+            {section.items.map((interest) => {
+              const active = selected.includes(interest.key);
+              return (
+                <Pressable
+                  key={interest.key}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => toggleInterest(interest.key)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {interest.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
 
       <Text style={styles.countText}>{selected.length} selected</Text>
 
@@ -109,6 +113,17 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: colors.textSub,
     marginBottom: spacing.lg,
+  },
+  sectionBlock: {
+    marginBottom: spacing.lg,
+  },
+  sectionHeading: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.textSub,
+    marginBottom: 10,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   chipGrid: {
     flexDirection: "row",

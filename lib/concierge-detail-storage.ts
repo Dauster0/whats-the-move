@@ -6,6 +6,8 @@ const KEY = "@concierge/detail-payload-v1";
 export type ConciergeDetailPayload = {
   suggestion: ConciergeSuggestion;
   others: ConciergeSuggestion[];
+  /** Opened from card tap — user must choose I’m going / Not for me (no auto-commit). */
+  peek?: boolean;
 };
 
 /** Synchronous handoff so navigation never waits on AsyncStorage. */

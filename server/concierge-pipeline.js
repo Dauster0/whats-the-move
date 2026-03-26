@@ -9,6 +9,8 @@ import { enrichConciergeMovieSuggestions } from "./movie-enrichment.js";
 import { fetchPlacesWideNet } from "./places-wide-net.js";
 import { SYSTEM_PROMPT } from "./concierge-prompt.js";
 import { filterAndSortByScore, haversineMiles } from "./concierge-scoring.js";
+import { formatHumanGoingOutTime } from "./human-event-time.js";
+import { ALL_INTEREST_LABEL_PAIRS } from "./interest-labels.js";
 
 const TM_KEY = process.env.TICKETMASTER_API_KEY || process.env.EXPO_PUBLIC_TICKETMASTER_API_KEY;
 const GOOGLE_KEY =
@@ -304,6 +306,108 @@ async function fetchTicketmasterNearby(lat, lng, nowIso) {
   }
 }
 
+async function fetchTicketmasterInDateRange(lat, lng, startIso, endIso) {
+  if (!TM_KEY || TM_KEY.includes("your_")) return [];
+  try {
+    const perQuerySize = 20;
+    const batches = await Promise.all(
+      TM_PARALLEL_QUERIES.map((q) =>
+        fetchTicketmasterDiscoverySegment(lat, lng, startIso, endIso, {
+          segmentId: q.segmentId,
+          keyword: q.keyword,
+          size: perQuerySize,
+        }).catch(() => [])
+      )
+    );
+    const byId = new Map();
+    for (const rawEvents of batches) {
+      for (const e of rawEvents) {
+        if (isTmDiscoveryEventCancelledOrBad(e)) continue;
+        const row = mapTmDiscoveryEventToRecord(e);
+        if (!row || byId.has(row.id)) continue;
+        byId.set(row.id, row);
+      }
+    }
+    return [...byId.values()].sort(
+      (a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function ymdAddDays(ymd, deltaDays, tz) {
+  const [y, m, d] = String(ymd)
+    .split("-")
+    .map((x) => Number(x));
+  if (!y || !m || !d) return "";
+  const ms = Date.UTC(y, m - 1, d + deltaDays, 12, 0, 0);
+  return calendarYmdInTz(ms, tz);
+}
+
+function thisWeekendYmdSet(nowIso, tz) {
+  const todayYmd = ymdInTimeZone(nowIso, tz);
+  const wd = weekdayLongForYmdInTz(todayYmd, tz);
+  let friYmd = "";
+  if (wd === "Saturday") friYmd = ymdAddDays(todayYmd, -1, tz);
+  else if (wd === "Sunday") friYmd = ymdAddDays(todayYmd, -2, tz);
+  else if (wd === "Friday") friYmd = todayYmd;
+  else {
+    for (let d = 1; d <= 6; d++) {
+      const y = ymdAddDays(todayYmd, d, tz);
+      if (weekdayLongForYmdInTz(y, tz) === "Friday") {
+        friYmd = y;
+        break;
+      }
+    }
+  }
+  if (!friYmd) return new Set();
+  return new Set([friYmd, ymdAddDays(friYmd, 1, tz), ymdAddDays(friYmd, 2, tz)]);
+}
+
+function filterAheadTmRecords(records, mode, nowIso, timeZone, pickedDateYmd) {
+  const nowMs = new Date(nowIso).getTime();
+  const todayYmd = ymdInTimeZone(nowIso, timeZone);
+  if (mode === "tonight") {
+    return (records || []).filter((r) => {
+      const start = tmRecordStartMs(r);
+      if (start == null || start <= nowMs + 5 * 60 * 1000) return false;
+      const ymd =
+        String(r.localDate || "").trim() ||
+        (r.startIso ? ymdInTimeZone(r.startIso, timeZone) : "");
+      return ymd === todayYmd;
+    });
+  }
+  if (mode === "weekend") {
+    const set = thisWeekendYmdSet(nowIso, timeZone);
+    return (records || []).filter((r) => {
+      const ymd =
+        String(r.localDate || "").trim() ||
+        (r.startIso ? ymdInTimeZone(r.startIso, timeZone) : "");
+      return set.has(ymd);
+    });
+  }
+  if (mode === "date") {
+    const pick = String(pickedDateYmd || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pick)) return [];
+    return (records || []).filter((r) => {
+      const ymd =
+        String(r.localDate || "").trim() ||
+        (r.startIso ? ymdInTimeZone(r.startIso, timeZone) : "");
+      return ymd === pick;
+    });
+  }
+  if (mode === "further") {
+    const limit = nowMs + 90 * 86400000;
+    return (records || []).filter((r) => {
+      const start = tmRecordStartMs(r);
+      if (start == null) return false;
+      return start > nowMs + 36 * 3600000 && start <= limit;
+    });
+  }
+  return records || [];
+}
+
 function buildSuggestionKey(s) {
   const tid = String(s.ticketEventId || "").trim();
   if (tid) return `e:${tid}`;
@@ -320,43 +424,10 @@ function buildSuggestionKey(s) {
   return `t:${t}|${mq}`;
 }
 
-/** Same keys as app `USER_INTEREST_CHIPS` — keep in sync for positive/negative lists. */
-const ALL_INTEREST_ENTRIES = [
-  ["walking", "Walking"],
-  ["hikes", "Hikes & trails"],
-  ["coffee", "Coffee"],
-  ["dessert", "Dessert"],
-  ["exploring", "Exploring"],
-  ["bookstores", "Bookstores"],
-  ["museums", "Museums"],
-  ["movies", "Movies"],
-  ["theater", "Theater & plays"],
-  ["live-music", "Live music"],
-  ["concerts", "Concerts"],
-  ["comedy", "Comedy"],
-  ["improv", "Improv"],
-  ["karaoke", "Karaoke"],
-  ["dancing", "Dancing"],
-  ["trivia", "Trivia nights"],
-  ["nightlife", "Nightlife"],
-  ["sports", "Sports"],
-  ["bowling", "Bowling"],
-  ["arcade", "Arcade"],
-  ["farmers-markets", "Farmers markets"],
-  ["rooftops", "Rooftops"],
-  ["working out", "Working out"],
-  ["beach", "Beach"],
-  ["journaling", "Journaling"],
-  ["reading", "Reading"],
-  ["calling friends", "Calling friends"],
-  ["solo-recharge", "Solo recharge"],
-  ["cheap-hangouts", "Cheap hangouts"],
-];
-
 function buildInterestEnrichment(userInterests) {
   const selected = new Set((userInterests || []).map((x) => String(x).toLowerCase().trim()));
   const positive = (userInterests || []).map((x) => String(x));
-  const not_interested_in = ALL_INTEREST_ENTRIES.filter(([k]) => !selected.has(String(k).toLowerCase())).map(
+  const not_interested_in = ALL_INTEREST_LABEL_PAIRS.filter(([k]) => !selected.has(String(k).toLowerCase())).map(
     ([, label]) => label
   );
   return { positive_interests: positive, not_interested_in };
@@ -499,7 +570,7 @@ function filterSafetyMacArthur(suggestions, hour24) {
   });
 }
 
-function filterClosedVenuePlaces(suggestions, nearbyPlaces) {
+function filterClosedVenuePlaces(suggestions, nearbyPlaces, planningAhead = false) {
   const out = [];
   for (const s of suggestions) {
     if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") {
@@ -521,7 +592,7 @@ function filterClosedVenuePlaces(suggestions, nearbyPlaces) {
       continue;
     }
     const place = matchNearbyPlace(s, nearbyPlaces);
-    if (place && place.openNow === false) continue;
+    if (!planningAhead && place && place.openNow === false) continue;
     out.push(s);
   }
   return out;
@@ -598,7 +669,7 @@ function enforceTicketmasterGrounding(suggestions, records) {
 /**
  * Deterministic title/body for TM-backed rows so venue marketing copy cannot leak through.
  */
-function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
+function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel, nowMs, timeZone) {
   const byId = new Map(records.map((r) => [r.id, r]));
   return suggestions.map((s) => {
     const id = String(s.ticketEventId || "").trim();
@@ -615,6 +686,11 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
         : whenLab && whenLab !== "Tonight" && !when
           ? whenLab
           : when;
+    const evMs = tmRecordStartMs(e);
+    const humanStart =
+      timeZone && evMs != null && !Number.isNaN(nowMs)
+        ? formatHumanGoingOutTime(nowMs, evMs, timeZone)
+        : "";
     const genre = String(e.genre || "").trim();
     const seg = String(e.segment || "").trim();
     const genreBit = genre && seg && genre !== seg ? `${genre}, ${seg}` : genre || seg;
@@ -641,7 +717,7 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel) {
       ticketUrl: url,
       ticketEventId: id,
       mapQuery: venue ? `${venue} ${areaLabel}`.slice(0, 200) : s.mapQuery,
-      startTime: whenLead || when || s.startTime,
+      startTime: String(humanStart || when || s.startTime || "").trim().slice(0, 80),
       category: "event",
       cost: String(costLine || s.cost || "").slice(0, 48),
     };
@@ -744,6 +820,8 @@ function buildGptUserPayload({
   lng,
   userContextLine,
   deckCategoryFocus,
+  decayRecentNames,
+  planningAhead,
 }) {
   const interestPayload = buildInterestEnrichment(interests);
   const timeBucket = getTimeOfDayBucket(wall.hour24);
@@ -824,6 +902,23 @@ function buildGptUserPayload({
     base.deck_category_focus = focus;
   }
 
+  const decay = Array.isArray(decayRecentNames)
+    ? decayRecentNames.map((x) => String(x).trim()).filter(Boolean).slice(0, 48)
+    : [];
+  if (decay.length > 0) {
+    base.decay_recent_venues = decay;
+  }
+
+  if (planningAhead && planningAhead.label) {
+    base.planning_ahead = {
+      mode: planningAhead.mode,
+      window_label: planningAhead.label,
+      instructions: planningAhead.instruction,
+    };
+    base.it_is_currently = `PLANNING AHEAD (${planningAhead.label}): ${planningAhead.instruction} Use only real rows from nearby_events and nearby_places. Venues do not need to be open at the current clock. Add a short date_badge on every suggestion (e.g. "Tonight 8PM", "This Sat", "Apr 12", "Jun 7") matching the target time.`;
+    base.meal_timing_rules = `Future window — pick meal types that fit the event or typical hours for that daypart; do not apply "no dinner at 2pm" rules from the current clock.`;
+  }
+
   return base;
 }
 
@@ -896,6 +991,7 @@ function normalizeSuggestions(raw) {
       cost: cost.slice(0, 48),
       isTimeSensitive: Boolean(s.isTimeSensitive),
       distanceText: String(s.distanceText || "").slice(0, 120),
+      dateBadge: String(s.dateBadge || s.date_badge || "").trim().slice(0, 40),
     };
     if (placeId && placeId.startsWith("places/")) {
       row.googlePlaceResourceName = placeId.slice(0, 256);
@@ -951,6 +1047,12 @@ export async function runConciergeRecommendations(body) {
   const swipeSignals =
     body.swipeSignals && typeof body.swipeSignals === "object" ? body.swipeSignals : null;
 
+  const conciergeTier =
+    String(body.conciergeTier || body.concierge_tier || "").toLowerCase() === "plus" ||
+    body.plus === true
+      ? "plus"
+      : "free";
+
   const wall = wallPartsFromIso(nowIso, timeZone);
 
   if (interests.length === 0) {
@@ -969,8 +1071,9 @@ export async function runConciergeRecommendations(body) {
   nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
   let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 7)
     .slice()
-    .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0))
-    .slice(0, 20);
+    .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0));
+  const tmCap = conciergeTier === "plus" ? 20 : 8;
+  ticketmasterRecords = ticketmasterRecords.slice(0, tmCap);
   ticketmasterRecords = ticketmasterRecords.map((r) => ({
     ...r,
     whenLabel: computeEventWhenLabel(r, nowIso, timeZone),
@@ -1005,6 +1108,16 @@ export async function runConciergeRecommendations(body) {
     })
   );
 
+  const decayRecentNames =
+    conciergeTier === "plus" && Array.isArray(body.decayRecentNames)
+      ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
+      : [];
+
+  const swipeSignalsForModel =
+    conciergeTier === "plus" && swipeSignals && typeof swipeSignals === "object"
+      ? swipeSignals
+      : null;
+
   const gptUserPayload = buildGptUserPayload({
     nowIso,
     timeZone,
@@ -1018,11 +1131,13 @@ export async function runConciergeRecommendations(body) {
     ticketmasterEvents,
     nearbyPlacesAnnotated: nearbyPlaces,
     userAge,
-    swipeSignals,
+    swipeSignals: swipeSignalsForModel,
     lat,
     lng,
     userContextLine,
     deckCategoryFocus,
+    decayRecentNames,
+    planningAhead: null,
   });
 
   const openaiKey = process.env.OPENAI_API_KEY?.trim();
@@ -1069,7 +1184,13 @@ export async function runConciergeRecommendations(body) {
   if (suggestions.length < 2) suggestions = beforeClose;
 
   suggestions = enforceTicketmasterGrounding(suggestions, ticketmasterRecords);
-  suggestions = mergeCanonicalTicketmasterCopy(suggestions, ticketmasterRecords, areaLabel);
+  suggestions = mergeCanonicalTicketmasterCopy(
+    suggestions,
+    ticketmasterRecords,
+    areaLabel,
+    new Date(nowIso).getTime(),
+    timeZone
+  );
   if (suggestions.length === 0) {
     throw new Error("No valid suggestions after grounding ticketed events");
   }
@@ -1124,6 +1245,295 @@ export async function runConciergeRecommendations(body) {
       eventCount: ticketmasterEvents.length,
       placeCount: nearbyPlaces.length,
       model,
+    },
+  };
+}
+
+export async function runConciergeAheadRecommendations(body) {
+  const lat = body.lat != null ? Number(body.lat) : null;
+  const lng = body.lng != null ? Number(body.lng) : body.lon != null ? Number(body.lon) : null;
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    throw new Error("lat and lng required");
+  }
+
+  const timeZone = typeof body.timeZone === "string" ? body.timeZone : "UTC";
+  const nowIsoRaw = typeof body.nowIso === "string" ? body.nowIso.trim() : "";
+  const nowIso = nowIsoRaw || new Date().toISOString();
+  const nowMs = new Date(nowIso).getTime();
+  const mode = String(body.aheadWindow || body.ahead_window || "").toLowerCase();
+  const validAhead = ["tonight", "weekend", "date", "further"];
+  if (!validAhead.includes(mode)) {
+    throw new Error("aheadWindow must be tonight | weekend | date | further");
+  }
+  const pickedDateYmd = String(body.pickedDateYmd || body.picked_date_ymd || "").trim();
+  if (mode === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(pickedDateYmd)) {
+    throw new Error("pickedDateYmd (YYYY-MM-DD) required for date window");
+  }
+
+  const energy = ["low", "medium", "high"].includes(body.energy) ? body.energy : "medium";
+  const timeBudget = ["30min", "mid", "allday"].includes(body.timeBudget) ? body.timeBudget : "mid";
+  const areaLabel = String(body.areaLabel || body.area || "near you").slice(0, 80);
+  const interests = Array.isArray(body.interests) ? body.interests.map((x) => String(x)).slice(0, 24) : [];
+  if (interests.length === 0) {
+    throw new Error(
+      "Add at least one interest (menu → Interests) so we can personalize your deck."
+    );
+  }
+
+  const recentSuggestions = Array.isArray(body.recentSuggestions)
+    ? body.recentSuggestions.map((x) => String(x)).slice(0, 20)
+    : [];
+  const excludeSuggestionKeys = Array.isArray(body.excludeSuggestionKeys)
+    ? body.excludeSuggestionKeys.map((x) => String(x)).slice(0, 200)
+    : [];
+  const userContextLine = String(body.userContextLine || "").slice(0, 800);
+  const hungerPreference = ["any", "hungry", "not_hungry"].includes(body.hungerPreference)
+    ? body.hungerPreference
+    : "any";
+  const ageRange =
+    typeof body.ageRange === "string" &&
+    ["under18", "18-24", "25-34", "35-44", "45+", "prefer_not"].includes(body.ageRange)
+      ? body.ageRange
+      : "prefer_not";
+  const userAge =
+    typeof body.userAge === "string" && body.userAge.trim()
+      ? body.userAge.trim().slice(0, 8)
+      : approximateAgeLabel(ageRange);
+  const swipeSignals =
+    body.swipeSignals && typeof body.swipeSignals === "object" ? body.swipeSignals : null;
+  const conciergeTier =
+    String(body.conciergeTier || body.concierge_tier || "").toLowerCase() === "plus" ||
+    body.plus === true
+      ? "plus"
+      : "free";
+  const decayRecentNames =
+    conciergeTier === "plus" && Array.isArray(body.decayRecentNames)
+      ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
+      : [];
+  const swipeSignalsForAhead =
+    conciergeTier === "plus" && swipeSignals && typeof swipeSignals === "object"
+      ? swipeSignals
+      : null;
+  const wall = wallPartsFromIso(nowIso, timeZone);
+
+  const tmApiStartIso = new Date(nowMs - 15 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const endMs =
+    mode === "further"
+      ? nowMs + 90 * 86400000
+      : mode === "date"
+        ? nowMs + 120 * 86400000
+        : nowMs + 21 * 86400000;
+  const tmApiEndIso = new Date(endMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+  const [weather, allTm, nearbyPlacesRaw] = await Promise.all([
+    fetchWeatherSummary(lat, lng),
+    fetchTicketmasterInDateRange(lat, lng, tmApiStartIso, tmApiEndIso),
+    fetchPlacesWideNet(lat, lng, GOOGLE_KEY, interests, { relaxOpenNow: true }),
+  ]);
+
+  let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
+  nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
+
+  let ticketmasterRecords = filterAheadTmRecords(allTm, mode, nowIso, timeZone, pickedDateYmd);
+  if (ticketmasterRecords.length < 4) {
+    const fallback = filterTicketmasterUpcomingWindow(allTm, nowMs, mode === "tonight" ? 2 : 14);
+    if (fallback.length > ticketmasterRecords.length) ticketmasterRecords = fallback;
+  }
+  const tmAheadCap = conciergeTier === "plus" ? 40 : 12;
+  ticketmasterRecords = ticketmasterRecords
+    .slice()
+    .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0))
+    .slice(0, tmAheadCap);
+  ticketmasterRecords = ticketmasterRecords.map((r) => ({
+    ...r,
+    whenLabel: computeEventWhenLabel(r, nowIso, timeZone),
+  }));
+
+  const ticketmasterEvents = ticketmasterRecords.map(
+    ({
+      id,
+      name,
+      venue,
+      startIso: sIso,
+      localDate,
+      localTime,
+      url,
+      segment,
+      genre,
+      priceLabel,
+      whenLabel,
+    }) => ({
+      id,
+      name,
+      venue,
+      startIso: sIso,
+      localDate,
+      localTime,
+      url,
+      segment,
+      genre,
+      priceLabel,
+      whenLabel,
+      requiredCardTitle: `${name} at ${venue}`.slice(0, 120),
+    })
+  );
+
+  const labelMap = {
+    tonight: "Tonight",
+    weekend: "This weekend (Fri–Sun)",
+    date: `Pick a date (${pickedDateYmd})`,
+    further: "Next 1–90 days",
+  };
+  const instrMap = {
+    tonight:
+      "Only things still happening later today (local) that have not started yet — shows, games, late doors.",
+    weekend:
+      "Fri–Sun: ticketed events, markets, outdoor hangs, recurring weekend rituals. Ground in data when possible.",
+    date: `Anchor every pick to ${pickedDateYmd} in the user's timezone.`,
+    further:
+      "1–90 days out: tours, festivals, sports, headline shows. Prefer real Ticketmaster rows from nearby_events.",
+  };
+
+  const planningAhead = {
+    mode,
+    label: labelMap[mode],
+    instruction: instrMap[mode],
+  };
+
+  const gptUserPayload = buildGptUserPayload({
+    nowIso,
+    timeZone,
+    wall,
+    areaLabel,
+    energy,
+    timeBudget,
+    interests,
+    recentSuggestions,
+    weather,
+    ticketmasterEvents,
+    nearbyPlacesAnnotated: nearbyPlaces,
+    userAge,
+    swipeSignals: swipeSignalsForAhead,
+    lat,
+    lng,
+    userContextLine,
+    deckCategoryFocus: "",
+    decayRecentNames,
+    planningAhead,
+  });
+
+  const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!openaiKey || openaiKey.includes("your")) {
+    throw new Error("OPENAI_API_KEY not configured");
+  }
+  const client = new OpenAI({ apiKey: openaiKey });
+  const model = process.env.CONCIERGE_MODEL || "gpt-4o";
+
+  const completion = await client.chat.completions.create({
+    model,
+    temperature: 0.75,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `USER MESSAGE (inject all context as JSON):\n${JSON.stringify(gptUserPayload)}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const text = completion.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Empty model response");
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Model returned non-JSON");
+  }
+
+  let suggestions = normalizeSuggestions(parsed);
+  if (suggestions.length === 0) {
+    throw new Error("No valid suggestions in model output");
+  }
+
+  suggestions = attachPlaceResourceNames(suggestions, nearbyPlaces);
+  suggestions = filterExcludedKeys(suggestions, excludeSuggestionKeys);
+  suggestions = filterSafetyMacArthur(suggestions, wall.hour24);
+  const beforeClose = suggestions.slice();
+  suggestions = filterClosedVenuePlaces(suggestions, nearbyPlaces, true);
+  if (suggestions.length < 2) suggestions = beforeClose;
+
+  suggestions = enforceTicketmasterGrounding(suggestions, ticketmasterRecords);
+  suggestions = mergeCanonicalTicketmasterCopy(
+    suggestions,
+    ticketmasterRecords,
+    areaLabel,
+    new Date(nowIso).getTime(),
+    timeZone
+  );
+  if (suggestions.length === 0) {
+    throw new Error("No valid suggestions after grounding ticketed events");
+  }
+
+  const beforeInterestMeal = suggestions.slice();
+  suggestions = filterMuseumInterestPolicy(suggestions, interests, ticketmasterRecords, nearbyPlaces);
+  if (suggestions.length < 2) suggestions = beforeInterestMeal;
+
+  suggestions = filterAndSortByScore(suggestions, {
+    hour24: wall.hour24,
+    userLat: lat,
+    userLng: lng,
+    nearbyPlaces,
+  });
+
+  const preHunger = suggestions.slice();
+  suggestions = filterHungerPreference(suggestions, hungerPreference);
+  if (suggestions.length === 0) suggestions = preHunger;
+
+  const unsplashKey = getUnsplashKey();
+  const seedBase = `${nowIso}-ahead-${mode}-${lat.toFixed(2)}-${lng.toFixed(2)}`;
+  suggestions = await resolveConciergeSuggestionImages({
+    suggestions,
+    ticketmasterRecords,
+    nearbyPlaces,
+    unsplashKey,
+    seedBase,
+    googleApiKey: GOOGLE_KEY && !String(GOOGLE_KEY).includes("your") ? GOOGLE_KEY : "",
+  });
+
+  suggestions = await enrichConciergeMovieSuggestions(suggestions, {
+    lat,
+    lng,
+    timeZone,
+    nowIso,
+    areaLabel,
+    energy,
+    userContextLine,
+    nearbyPlaces,
+  });
+
+  suggestions = attachPlaceMeta(suggestions, nearbyPlaces, nowIso);
+
+  suggestions = suggestions.map((s) => {
+    if (String(s.dateBadge || "").trim()) return s;
+    const id = String(s.ticketEventId || "").trim();
+    if (!id) return s;
+    const rec = ticketmasterRecords.find((r) => r.id === id);
+    const badge =
+      rec?.whenLabel ||
+      (rec?.localDate ? String(rec.localDate).slice(5).replace("-", "/") : "");
+    if (!badge) return s;
+    return { ...s, dateBadge: badge };
+  });
+
+  return {
+    suggestions,
+    meta: {
+      weather,
+      eventCount: ticketmasterEvents.length,
+      placeCount: nearbyPlaces.length,
+      model,
+      aheadWindow: mode,
     },
   };
 }

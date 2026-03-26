@@ -9,7 +9,10 @@ import {
   fetchUnsplashEditorial,
   getEditorialAltRejectSubstrings,
 } from "./editorial-photos.js";
-import { runConciergeRecommendations } from "./concierge-pipeline.js";
+import {
+  runConciergeAheadRecommendations,
+  runConciergeRecommendations,
+} from "./concierge-pipeline.js";
 import {
   runConciergeDetail,
   runConciergeDetailQuick,
@@ -2439,6 +2442,21 @@ app.post("/concierge-recommendations", async (req, res) => {
     res.json(out);
   } catch (err) {
     console.error("concierge-recommendations:", err?.message || err);
+    res.status(422).json({
+      error: String(err?.message || err),
+      suggestions: [],
+      meta: null,
+    });
+  }
+});
+
+app.post("/concierge-ahead", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const out = await runConciergeAheadRecommendations(req.body || {});
+    res.json(out);
+  } catch (err) {
+    console.error("concierge-ahead:", err?.message || err);
     res.status(422).json({
       error: String(err?.message || err),
       suggestions: [],

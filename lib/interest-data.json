@@ -1,0 +1,167 @@
+{
+  "sections": [
+    {
+      "title": "Basics",
+      "items": [
+        { "key": "walking", "label": "Walking" },
+        { "key": "hikes", "label": "Hikes & trails" },
+        { "key": "coffee", "label": "Coffee" },
+        { "key": "dessert", "label": "Dessert" },
+        { "key": "exploring", "label": "Exploring" },
+        { "key": "bookstores", "label": "Bookstores" },
+        { "key": "museums", "label": "Museums" },
+        { "key": "movies", "label": "Movies" },
+        { "key": "theater", "label": "Theater & plays" },
+        { "key": "live-music", "label": "Live music" },
+        { "key": "concerts", "label": "Concerts" },
+        { "key": "comedy", "label": "Comedy" },
+        { "key": "improv", "label": "Improv" },
+        { "key": "karaoke", "label": "Karaoke" },
+        { "key": "dancing", "label": "Dancing" },
+        { "key": "trivia", "label": "Trivia nights" },
+        { "key": "nightlife", "label": "Nightlife" },
+        { "key": "sports", "label": "Sports" },
+        { "key": "bowling", "label": "Bowling" },
+        { "key": "arcade", "label": "Arcade" },
+        { "key": "farmers-markets", "label": "Farmers markets" },
+        { "key": "rooftops", "label": "Rooftops" },
+        { "key": "working out", "label": "Working out" },
+        { "key": "beach", "label": "Beach" },
+        { "key": "journaling", "label": "Journaling" },
+        { "key": "reading", "label": "Reading" },
+        { "key": "calling friends", "label": "Calling friends" },
+        { "key": "solo-recharge", "label": "Solo recharge" },
+        { "key": "cheap-hangouts", "label": "Cheap hangouts" }
+      ]
+    },
+    {
+      "title": "Sports & fitness",
+      "items": [
+        { "key": "pickleball", "label": "Pickleball" },
+        { "key": "tennis", "label": "Tennis" },
+        { "key": "basketball", "label": "Basketball" },
+        { "key": "soccer", "label": "Soccer" },
+        { "key": "football", "label": "Football" },
+        { "key": "baseball", "label": "Baseball" },
+        { "key": "volleyball", "label": "Volleyball" },
+        { "key": "swimming", "label": "Swimming" },
+        { "key": "rock-climbing", "label": "Rock climbing" },
+        { "key": "bouldering", "label": "Bouldering" },
+        { "key": "surfing", "label": "Surfing" },
+        { "key": "skating", "label": "Skating" },
+        { "key": "skateboarding", "label": "Skateboarding" },
+        { "key": "cycling", "label": "Cycling" },
+        { "key": "running", "label": "Running" },
+        { "key": "yoga", "label": "Yoga" },
+        { "key": "pilates", "label": "Pilates" },
+        { "key": "martial-arts", "label": "Martial arts" },
+        { "key": "karate", "label": "Karate" },
+        { "key": "boxing", "label": "Boxing" },
+        { "key": "bjj", "label": "BJJ / Jiu-Jitsu" },
+        { "key": "crossfit", "label": "CrossFit" },
+        { "key": "golf", "label": "Golf" },
+        { "key": "frisbee", "label": "Frisbee" },
+        { "key": "paddle-boarding", "label": "Paddle boarding" }
+      ]
+    },
+    {
+      "title": "Food & drink",
+      "items": [
+        { "key": "brunch", "label": "Brunch" },
+        { "key": "sushi", "label": "Sushi" },
+        { "key": "tacos", "label": "Tacos" },
+        { "key": "ramen", "label": "Ramen" },
+        { "key": "bbq", "label": "BBQ" },
+        { "key": "pizza", "label": "Pizza" },
+        { "key": "wine-bars", "label": "Wine bars" },
+        { "key": "craft-beer", "label": "Craft beer" },
+        { "key": "cocktail-bars", "label": "Cocktail bars" },
+        { "key": "speakeasies", "label": "Speakeasies" },
+        { "key": "food-trucks", "label": "Food trucks" },
+        { "key": "night-markets", "label": "Night markets" },
+        { "key": "cooking-classes", "label": "Cooking classes" },
+        { "key": "tasting-menus", "label": "Tasting menus" }
+      ]
+    },
+    {
+      "title": "Arts & culture",
+      "items": [
+        { "key": "art-galleries", "label": "Art galleries" },
+        { "key": "street-art", "label": "Street art" },
+        { "key": "photography", "label": "Photography" },
+        { "key": "film-festivals", "label": "Film festivals" },
+        { "key": "indie-films", "label": "Indie films" },
+        { "key": "poetry-slams", "label": "Poetry slams" },
+        { "key": "open-mics", "label": "Open mics" },
+        { "key": "spoken-word", "label": "Spoken word" },
+        { "key": "cultural-festivals", "label": "Cultural festivals" },
+        { "key": "opera", "label": "Opera" },
+        { "key": "ballet", "label": "Ballet" },
+        { "key": "contemporary-dance", "label": "Contemporary dance" }
+      ]
+    },
+    {
+      "title": "Social & nightlife",
+      "items": [
+        { "key": "game-nights", "label": "Game nights" },
+        { "key": "escape-rooms", "label": "Escape rooms" },
+        { "key": "axe-throwing", "label": "Axe throwing" },
+        { "key": "mini-golf", "label": "Mini golf" },
+        { "key": "go-karts", "label": "Go-karts" },
+        { "key": "laser-tag", "label": "Laser tag" },
+        { "key": "paint-and-sip", "label": "Paint and sip" },
+        { "key": "pottery-classes", "label": "Pottery classes" },
+        { "key": "dance-classes", "label": "Dance classes" },
+        { "key": "salsa-nights", "label": "Salsa nights" },
+        { "key": "speed-dating", "label": "Speed dating" },
+        { "key": "bar-crawls", "label": "Bar crawls" },
+        { "key": "rooftop-parties", "label": "Rooftop parties" }
+      ]
+    },
+    {
+      "title": "Outdoors & nature",
+      "items": [
+        { "key": "hiking-outdoors", "label": "Hiking" },
+        { "key": "beach-volleyball", "label": "Beach volleyball" },
+        { "key": "tide-pools", "label": "Tide pools" },
+        { "key": "camping", "label": "Camping" },
+        { "key": "stargazing", "label": "Stargazing" },
+        { "key": "sunrise-spots", "label": "Sunrise spots" },
+        { "key": "sunset-spots", "label": "Sunset spots" },
+        { "key": "nature-walks", "label": "Nature walks" },
+        { "key": "dog-parks", "label": "Dog parks" },
+        { "key": "botanical-gardens", "label": "Botanical gardens" },
+        { "key": "kayaking", "label": "Kayaking" },
+        { "key": "snorkeling", "label": "Snorkeling" }
+      ]
+    },
+    {
+      "title": "Chill & solo",
+      "items": [
+        { "key": "cafes-to-work", "label": "Cafes to work" },
+        { "key": "journaling-spots", "label": "Journaling spots" },
+        { "key": "scenic-drives", "label": "Scenic drives" },
+        { "key": "people-watching", "label": "People watching" },
+        { "key": "thrift-shopping", "label": "Thrift shopping" },
+        { "key": "vintage-markets", "label": "Vintage markets" },
+        { "key": "record-stores", "label": "Record stores" },
+        { "key": "puzzle-cafes", "label": "Puzzle cafes" },
+        { "key": "board-game-cafes", "label": "Board game cafes" },
+        { "key": "spas", "label": "Spas" },
+        { "key": "sound-baths", "label": "Sound baths" }
+      ]
+    },
+    {
+      "title": "Learning & misc",
+      "items": [
+        { "key": "language-exchange", "label": "Language exchange meetups" },
+        { "key": "coding-meetups", "label": "Coding meetups" },
+        { "key": "networking-events", "label": "Networking events" },
+        { "key": "lectures-talks", "label": "Lectures and talks" },
+        { "key": "trivia-pub-quiz", "label": "Trivia / pub quizzes" },
+        { "key": "science-events", "label": "Science events" },
+        { "key": "astronomy-nights", "label": "Astronomy nights" }
+      ]
+    }
+  ]
+}

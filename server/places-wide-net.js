@@ -38,6 +38,100 @@ const INTEREST_TO_TYPES = {
   "calling friends": ["cafe", "bar", "restaurant", "park"],
   "solo-recharge": ["cafe", "park", "spa", "library"],
   "cheap-hangouts": ["park", "cafe", "coffee_shop", "bar"],
+  pickleball: ["gym", "park", "stadium"],
+  tennis: ["gym", "park", "stadium"],
+  basketball: ["gym", "park", "stadium"],
+  soccer: ["stadium", "gym", "park"],
+  football: ["stadium", "gym"],
+  baseball: ["stadium", "park"],
+  volleyball: ["gym", "park"],
+  swimming: ["gym", "park", "tourist_attraction"],
+  "rock-climbing": ["gym", "amusement_center"],
+  bouldering: ["gym", "amusement_center"],
+  surfing: ["park", "tourist_attraction"],
+  skating: ["amusement_center", "park"],
+  skateboarding: ["park", "amusement_center"],
+  cycling: ["park", "gym", "tourist_attraction"],
+  running: ["park", "gym", "tourist_attraction"],
+  yoga: ["gym", "spa"],
+  pilates: ["gym", "spa"],
+  "martial-arts": ["gym", "amusement_center"],
+  karate: ["gym", "amusement_center"],
+  boxing: ["gym", "amusement_center"],
+  bjj: ["gym", "amusement_center"],
+  crossfit: ["gym"],
+  golf: ["park", "tourist_attraction"],
+  frisbee: ["park", "tourist_attraction"],
+  "paddle-boarding": ["park", "tourist_attraction"],
+  brunch: ["restaurant", "cafe", "coffee_shop"],
+  sushi: ["restaurant", "meal_takeaway"],
+  tacos: ["restaurant", "meal_takeaway"],
+  ramen: ["restaurant", "meal_takeaway"],
+  bbq: ["restaurant", "meal_takeaway"],
+  pizza: ["restaurant", "meal_takeaway"],
+  "wine-bars": ["bar", "restaurant"],
+  "craft-beer": ["bar", "restaurant"],
+  "cocktail-bars": ["bar", "night_club"],
+  speakeasies: ["bar", "night_club"],
+  "food-trucks": ["meal_takeaway", "restaurant"],
+  "night-markets": ["shopping_mall", "tourist_attraction", "supermarket"],
+  "cooking-classes": ["restaurant", "meal_takeaway"],
+  "tasting-menus": ["restaurant"],
+  "art-galleries": ["art_gallery", "museum"],
+  "street-art": ["tourist_attraction", "art_gallery"],
+  photography: ["art_gallery", "tourist_attraction"],
+  "film-festivals": ["movie_theater", "tourist_attraction"],
+  "indie-films": ["movie_theater"],
+  "poetry-slams": ["night_club", "bar"],
+  "open-mics": ["night_club", "bar"],
+  "spoken-word": ["night_club", "bar"],
+  "cultural-festivals": ["tourist_attraction", "shopping_mall"],
+  opera: ["movie_theater", "tourist_attraction"],
+  ballet: ["movie_theater", "tourist_attraction"],
+  "contemporary-dance": ["night_club", "movie_theater"],
+  "game-nights": ["amusement_center", "bar", "cafe"],
+  "escape-rooms": ["amusement_center", "tourist_attraction"],
+  "axe-throwing": ["amusement_center", "bowling_alley"],
+  "mini-golf": ["amusement_center", "park"],
+  "go-karts": ["amusement_center"],
+  "laser-tag": ["amusement_center"],
+  "paint-and-sip": ["art_gallery", "bar"],
+  "pottery-classes": ["art_gallery", "shopping_mall"],
+  "dance-classes": ["gym", "night_club"],
+  "salsa-nights": ["night_club", "bar"],
+  "speed-dating": ["bar", "night_club"],
+  "bar-crawls": ["bar", "night_club"],
+  "rooftop-parties": ["bar", "night_club"],
+  "hiking-outdoors": ["park", "tourist_attraction"],
+  "beach-volleyball": ["park", "tourist_attraction"],
+  "tide-pools": ["park", "tourist_attraction"],
+  camping: ["park", "tourist_attraction"],
+  stargazing: ["park", "tourist_attraction"],
+  "sunrise-spots": ["park", "tourist_attraction"],
+  "sunset-spots": ["park", "tourist_attraction"],
+  "nature-walks": ["park", "tourist_attraction"],
+  "dog-parks": ["park"],
+  "botanical-gardens": ["park", "tourist_attraction"],
+  kayaking: ["park", "tourist_attraction"],
+  snorkeling: ["aquarium", "tourist_attraction"],
+  "cafes-to-work": ["cafe", "coffee_shop", "library"],
+  "journaling-spots": ["cafe", "coffee_shop", "park", "library"],
+  "scenic-drives": ["tourist_attraction", "park"],
+  "people-watching": ["park", "cafe", "shopping_mall"],
+  "thrift-shopping": ["shopping_mall", "tourist_attraction"],
+  "vintage-markets": ["shopping_mall", "tourist_attraction"],
+  "record-stores": ["shopping_mall", "book_store"],
+  "puzzle-cafes": ["cafe", "coffee_shop"],
+  "board-game-cafes": ["cafe", "coffee_shop", "amusement_center"],
+  spas: ["spa"],
+  "sound-baths": ["spa", "gym"],
+  "language-exchange": ["cafe", "bar", "restaurant"],
+  "coding-meetups": ["cafe", "coffee_shop"],
+  "networking-events": ["bar", "restaurant", "night_club"],
+  "lectures-talks": ["museum", "library", "tourist_attraction"],
+  "trivia-pub-quiz": ["bar", "restaurant", "night_club"],
+  "science-events": ["museum", "tourist_attraction"],
+  "astronomy-nights": ["museum", "park", "tourist_attraction"],
 };
 
 const BASELINE_TYPES = [
@@ -165,8 +259,10 @@ async function searchNearbyOne(googleKey, lat, lng, includedTypes) {
 
 /**
  * Parallel nearby searches by type batches; dedupe; filter open + rating; top N for model.
+ * @param {{ relaxOpenNow?: boolean }} [options] — when true, skip open-now gating (future planning).
  */
-export async function fetchPlacesWideNet(lat, lng, googleKey, interests) {
+export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options = {}) {
+  const relaxOpenNow = options.relaxOpenNow === true;
   if (
     !googleKey ||
     googleKey === "your_key_here" ||
@@ -197,18 +293,29 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests) {
   const openOk = (p) => p.openNow === true;
   const rated = (p, min) => p.rating == null || p.rating >= min;
 
-  let filtered = merged.filter((p) => openOk(p) && rated(p, MIN_RATING_STRICT));
-  if (filtered.length < 12) {
-    filtered = merged.filter((p) => (p.openNow === true || p.openNow == null) && rated(p, MIN_RATING_STRICT));
-  }
-  if (filtered.length < 12) {
-    filtered = merged.filter((p) => (p.openNow === true || p.openNow == null) && rated(p, MIN_RATING_RELAXED));
-  }
-  if (filtered.length < 8) {
-    filtered = merged.filter((p) => rated(p, MIN_RATING_RELAXED));
-  }
-  if (filtered.length === 0) {
-    filtered = merged;
+  let filtered;
+  if (relaxOpenNow) {
+    filtered = merged.filter((p) => rated(p, MIN_RATING_STRICT));
+    if (filtered.length < 12) {
+      filtered = merged.filter((p) => rated(p, MIN_RATING_RELAXED));
+    }
+    if (filtered.length < 8) {
+      filtered = merged;
+    }
+  } else {
+    filtered = merged.filter((p) => openOk(p) && rated(p, MIN_RATING_STRICT));
+    if (filtered.length < 12) {
+      filtered = merged.filter((p) => (p.openNow === true || p.openNow == null) && rated(p, MIN_RATING_STRICT));
+    }
+    if (filtered.length < 12) {
+      filtered = merged.filter((p) => (p.openNow === true || p.openNow == null) && rated(p, MIN_RATING_RELAXED));
+    }
+    if (filtered.length < 8) {
+      filtered = merged.filter((p) => rated(p, MIN_RATING_RELAXED));
+    }
+    if (filtered.length === 0) {
+      filtered = merged;
+    }
   }
 
   filtered.sort((a, b) => {
