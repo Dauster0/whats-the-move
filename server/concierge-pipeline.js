@@ -823,6 +823,7 @@ function buildGptUserPayload({
   userContextLine,
   deckCategoryFocus,
   decayRecentNames,
+  savedMoveTitles,
   planningAhead,
 }) {
   const interestPayload = buildInterestEnrichment(interests);
@@ -919,6 +920,13 @@ function buildGptUserPayload({
     : [];
   if (decay.length > 0) {
     base.decay_recent_venues = decay;
+  }
+
+  const savedArr = Array.isArray(savedMoveTitles)
+    ? savedMoveTitles.map((x) => String(x).trim()).filter(Boolean).slice(0, 20)
+    : [];
+  if (savedArr.length > 0) {
+    base.saved_moves = savedArr;
   }
 
   if (planningAhead && planningAhead.label) {
@@ -1126,15 +1134,16 @@ export async function runConciergeRecommendations(body) {
     })
   );
 
-  const decayRecentNames =
-    conciergeTier === "plus" && Array.isArray(body.decayRecentNames)
-      ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
-      : [];
+  const decayRecentNames = Array.isArray(body.decayRecentNames)
+    ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
+    : [];
 
   const swipeSignalsForModel =
-    conciergeTier === "plus" && swipeSignals && typeof swipeSignals === "object"
-      ? swipeSignals
-      : null;
+    swipeSignals && typeof swipeSignals === "object" ? swipeSignals : null;
+
+  const savedMoveTitles = Array.isArray(body.savedMoveTitles)
+    ? body.savedMoveTitles.map((x) => String(x)).filter(Boolean).slice(0, 20)
+    : [];
 
   const gptUserPayload = buildGptUserPayload({
     nowIso,
@@ -1156,6 +1165,7 @@ export async function runConciergeRecommendations(body) {
     userContextLine,
     deckCategoryFocus,
     decayRecentNames,
+    savedMoveTitles,
     planningAhead: null,
   });
 
@@ -1325,14 +1335,14 @@ export async function runConciergeAheadRecommendations(body) {
     body.plus === true
       ? "plus"
       : "free";
-  const decayRecentNames =
-    conciergeTier === "plus" && Array.isArray(body.decayRecentNames)
-      ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
-      : [];
+  const decayRecentNames = Array.isArray(body.decayRecentNames)
+    ? body.decayRecentNames.map((x) => String(x)).filter(Boolean)
+    : [];
   const swipeSignalsForAhead =
-    conciergeTier === "plus" && swipeSignals && typeof swipeSignals === "object"
-      ? swipeSignals
-      : null;
+    swipeSignals && typeof swipeSignals === "object" ? swipeSignals : null;
+  const savedMoveTitles = Array.isArray(body.savedMoveTitles)
+    ? body.savedMoveTitles.map((x) => String(x)).filter(Boolean).slice(0, 20)
+    : [];
   const wall = wallPartsFromIso(nowIso, timeZone);
 
   const tmApiStartIso = new Date(nowMs - 15 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -1438,6 +1448,7 @@ export async function runConciergeAheadRecommendations(body) {
     userContextLine,
     deckCategoryFocus: "",
     decayRecentNames,
+    savedMoveTitles,
     planningAhead,
   });
 

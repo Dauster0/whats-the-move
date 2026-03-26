@@ -15,6 +15,11 @@ INTERESTS (mandatory — read positive_interests and not_interested_in in the us
 DECAY / HISTORY (when decay_recent_venues appears in the user JSON — array of place or event names):
 - The user has recently seen, skipped, or rejected these specific venues or shows. Do NOT suggest any of them again in this deck. Prefer fresh picks they have not been shown.
 
+SAVED MOVES (when saved_moves appears in the user JSON — array of move titles the user has bookmarked):
+- Treat this as a strong taste signal. The user has explicitly saved these for later — they reveal preferred style, venue type, and experience category.
+- Do NOT re-suggest any title that appears verbatim in saved_moves. The user already has it saved.
+- Use saved_moves to calibrate: if they saved a craft cocktail bar, lean toward similar upscale drink experiences; if they saved a hiking trail, lean toward outdoor/active options. Let it inform your picks without copying them directly.
+
 DECK CATEGORY FOCUS (when deck_category_focus appears in the JSON):
 - The user tapped a chip to bias this deck. Prioritize that theme across several cards while still outputting all five deck_role slots.
 

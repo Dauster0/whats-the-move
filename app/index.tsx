@@ -247,13 +247,12 @@ export default function HomeScreen() {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const baseExclude = await getExcludeSuggestionKeys();
     let excludeSuggestionKeys = baseExclude;
-    let decayRecentNames: string[] = [];
-    if (plus) {
-      const decayKeys = await getDecayExcludedKeys();
-      excludeSuggestionKeys = [...new Set([...baseExclude, ...decayKeys])];
-      decayRecentNames = await getDecayContextForGpt();
-    }
-    const swipeSignals = plus ? await getSwipeSignalsForApi() : null;
+    const decayKeys = await getDecayExcludedKeys();
+    excludeSuggestionKeys = [...new Set([...baseExclude, ...decayKeys])];
+    const decayRecentNames = await getDecayContextForGpt();
+    const swipeSignals = await getSwipeSignalsForApi();
+    const savedMoves = await getSavedConciergeMoves();
+    const savedMoveTitles = savedMoves.slice(0, 20).map((m) => m.suggestion.title);
 
     const res = await fetch(`${SERVER_URL}/concierge-recommendations`, {
       method: "POST",
@@ -276,6 +275,7 @@ export default function HomeScreen() {
         ageRange: prefs.ageRange ?? "prefer_not",
         transportMode: prefs.transportMode ?? "driving",
         ...(swipeSignals ? { swipeSignals } : {}),
+        ...(savedMoveTitles.length > 0 ? { savedMoveTitles } : {}),
         ...(deckCategoryFocus ? { deckCategoryFocus } : {}),
       }),
     });
@@ -294,7 +294,6 @@ export default function HomeScreen() {
         mapApiConciergeSuggestion(item && typeof item === "object" ? (item as Record<string, unknown>) : {})
       )
     );
-    if (!plus) return mapped;
     const dk = new Set(await getDecayExcludedKeys());
     return filterSuggestionsByDecay(mapped, Date.now(), dk);
   }, [energy, timeBudget, deckCategoryFocus]);
@@ -490,7 +489,7 @@ export default function HomeScreen() {
       openPlusPaywall("wildcard");
       return;
     }
-    if (isPlusRef.current) void recordDecayCommitted(s);
+    void recordDecayCommitted(s);
     void recordSwipeCommit(s.category || "experience");
     void saveCommittedMove(s.title, s.category || "experience");
     persistSwipeForHistory(s);
@@ -541,7 +540,7 @@ export default function HomeScreen() {
         router.back();
       },
       onCommit: () => {
-        if (isPlusRef.current) void recordDecayCommitted(s);
+        void recordDecayCommitted(s);
         void recordSwipeCommit(s.category || "experience");
         void saveCommittedMove(s.title, s.category || "experience");
         persistSwipeForHistory(s);

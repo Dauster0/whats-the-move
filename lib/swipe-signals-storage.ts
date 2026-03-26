@@ -4,7 +4,7 @@ import { getHiddenSuggestions } from "./hidden-suggestions-storage";
 const KEY = "concierge_swipe_events_v1";
 const MAX_EVENTS = 400;
 /** After this many tracked swipes, send aggregates to the concierge model. */
-const MIN_FOR_API = 20;
+const MIN_FOR_API = 3;
 
 export type SkipReason =
   | "too_far"
