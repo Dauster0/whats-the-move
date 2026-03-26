@@ -271,7 +271,7 @@ export function ConciergeHeroCard({
 
       {s.distanceText || s.cost ? (
         <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={2}>
-          {[s.distanceText, s.cost].filter(Boolean).join(" · ")}
+          {[s.distanceText, s.cost].filter((v) => v && !/^varies$/i.test(String(v).trim())).join(" · ")}
         </Text>
       ) : null}
 

@@ -693,14 +693,18 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel, nowMs, 
         : "";
     const genre = String(e.genre || "").trim();
     const seg = String(e.segment || "").trim();
-    const genreBit = genre && seg && genre !== seg ? `${genre}, ${seg}` : genre || seg;
     const priceBit = String(e.priceLabel || "").trim();
-    const descParts = [
-      show + (genreBit ? `. ${genreBit}.` : "."),
-      whenLead ? ` ${whenLead}.` : "",
-      venue ? ` ${venue}.` : "",
-      priceBit ? ` Tickets from ${priceBit}.` : "",
-    ];
+    // Prefer GPT's description if it's more than just the event name repeated back
+    const gptDesc = String(s.description || "").trim();
+    const gptDescIsUseful = gptDesc.length > 40 && !gptDesc.toLowerCase().startsWith(show.toLowerCase().slice(0, 20).toLowerCase());
+    const descParts = gptDescIsUseful
+      ? [gptDesc, priceBit ? ` Tickets from ${priceBit}.` : ""]
+      : [
+          show + ".",
+          whenLead ? ` ${whenLead}.` : "",
+          venue ? ` ${venue}.` : "",
+          priceBit ? ` Tickets from ${priceBit}.` : "",
+        ];
     const description = descParts.join("").replace(/\s+/g, " ").trim().slice(0, 400);
     const url = String(e.url || s.ticketUrl || "").trim();
     const costLine =
