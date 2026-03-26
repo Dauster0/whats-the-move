@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
-const __dir = dirname(fileURLToPath(import.meta.url));
-const raw = readFileSync(join(__dir, "../lib/interest-data.json"), "utf8");
-const data = JSON.parse(raw);
+const require = createRequire(import.meta.url);
+/** Resolved next to this file (works when Railway root is `server/` → `/app`). */
+const data = require("./interest-data.json");
 
 /** [key, label] pairs — same source as app `USER_INTEREST_CHIPS` for not_interested_in. */
 export const ALL_INTEREST_LABEL_PAIRS = (data.sections || []).flatMap((sec) =>
