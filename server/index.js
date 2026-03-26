@@ -1,7 +1,20 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import { rateLimit } from "express-rate-limit";
+/** Lightweight in-process rate limiter — no external dependency. */
+function makeRateLimiter({ windowMs, max, message }) {
+  const hits = new Map();
+  setInterval(() => hits.clear(), windowMs).unref();
+  return (req, res, next) => {
+    const key = req.ip || req.socket?.remoteAddress || "unknown";
+    const count = (hits.get(key) || 0) + 1;
+    hits.set(key, count);
+    if (count > max) {
+      return res.status(429).json(message);
+    }
+    next();
+  };
+}
 import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
@@ -72,18 +85,14 @@ app.use(cors());
 app.use(express.json());
 
 /** Per-IP rate limits — protect OpenAI + Google quota during beta. */
-const aiLimiter = rateLimit({
+const aiLimiter = makeRateLimiter({
   windowMs: 60 * 1000,
   max: 12,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: "Too many requests — slow down and try again in a minute." },
 });
-const detailLimiter = rateLimit({
+const detailLimiter = makeRateLimiter({
   windowMs: 60 * 1000,
   max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: "Too many requests — try again in a minute." },
 });
 
