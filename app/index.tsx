@@ -623,7 +623,7 @@ export default function HomeScreen() {
 
   const menuItems = useMemo(() => {
     const rows: { label: string; href: Href }[] = [
-      { label: "Elsewhere Plus", href: "/elsewhere-plus?source=menu" },
+      { label: "What's the Move? Plus", href: "/elsewhere-plus?source=menu" },
       { label: "Interests", href: "/edit-interests" },
       { label: "Your details", href: "/my-context" },
     ];
@@ -705,7 +705,7 @@ export default function HomeScreen() {
       {sharperPicksBannerVisible ? (
         <View style={[styles.subtleBanner, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
           <Text style={[styles.subtleBannerText, { color: colors.text }]}>
-            Your picks are getting sharper. Elsewhere has learned what you’re into.
+            Your picks are getting sharper. What’s the Move? has learned what you’re into.
           </Text>
           <Pressable
             onPress={() => {
@@ -778,7 +778,7 @@ export default function HomeScreen() {
           <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
           <View style={styles.menuSheetContainer} pointerEvents="box-none">
             <View style={styles.menuSheet}>
-              <Text style={styles.menuSheetTitle}>Elsewhere</Text>
+              <Text style={styles.menuSheetTitle}>What's the Move?</Text>
               {menuItems.map((item, i, arr) => (
                 <View key={item.label}>
                   <Pressable

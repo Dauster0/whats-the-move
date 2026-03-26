@@ -1069,7 +1069,7 @@ export async function runConciergeRecommendations(body) {
   ]);
   let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
   nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
-  let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 1)
+  let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 2)
     .slice()
     .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0));
   const tmCap = conciergeTier === "plus" ? 20 : 8;
@@ -1078,6 +1078,8 @@ export async function runConciergeRecommendations(body) {
     ...r,
     whenLabel: computeEventWhenLabel(r, nowIso, timeZone),
   }));
+  // Main deck is "right now" — only show events happening tonight (same calendar day).
+  ticketmasterRecords = ticketmasterRecords.filter((r) => r.whenLabel === "Tonight");
 
   const ticketmasterEvents = ticketmasterRecords.map(
     ({

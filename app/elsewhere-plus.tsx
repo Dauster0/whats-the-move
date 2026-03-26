@@ -91,7 +91,7 @@ export default function ElsewherePlusScreen() {
 
           <Text style={styles.headline}>The move you almost missed.</Text>
           <Text style={styles.subhead}>
-            Elsewhere Plus surfaces the things happening tonight that most people never find out about.
+            What's the Move? Plus surfaces the things happening tonight that most people never find out about.
           </Text>
 
           <View style={styles.featureList}>
