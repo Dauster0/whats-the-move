@@ -202,9 +202,17 @@ function Splash({ onContinue }: { onContinue: () => void }) {
     <View style={sp.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* Upper area — app preview */}
+      {/* 1 — Headline at top */}
       <View style={[sp.upper, { paddingTop: insets.top + 24 }]}>
         <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
+        <Text style={sp.headline}>
+          {"Something good\nis happening\nnear you tonight."}
+        </Text>
+        <Text style={sp.body}>
+          {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
+        </Text>
+
+        {/* 2 — Move cards in the middle */}
         <View style={sp.previewOuter}>
           <View style={[sp.miniCard, { borderLeftColor: "#A78BFA" }]}>
             <Text style={sp.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
@@ -218,15 +226,8 @@ function Splash({ onContinue }: { onContinue: () => void }) {
         </View>
       </View>
 
-      {/* Bottom content */}
+      {/* 3 — Button pinned to bottom */}
       <View style={[sp.card, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
-        <Text style={sp.headline}>
-          {"Something good\nis happening\nnear you tonight."}
-        </Text>
-        <Text style={sp.body}>
-          {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
-        </Text>
-
         <Pressable onPress={onContinue} style={sp.btn} activeOpacity={0.85}>
           <Text style={sp.btnText}>Show me what's out there →</Text>
         </Pressable>
@@ -272,10 +273,8 @@ const sp = StyleSheet.create({
     letterSpacing: 1.4,
   },
   card: {
-    flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 8,
-    justifyContent: "flex-end",
+    paddingTop: 20,
   },
   headline: {
     fontSize: 36,
@@ -283,13 +282,14 @@ const sp = StyleSheet.create({
     color: WHITE,
     lineHeight: 42,
     letterSpacing: -0.5,
-    marginBottom: 14,
+    marginTop: 16,
+    marginBottom: 10,
   },
   body: {
     fontSize: 15,
     color: MUTED_LIGHT,
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   btn: {
     backgroundColor: PEACH,
