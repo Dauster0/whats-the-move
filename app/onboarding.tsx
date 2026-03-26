@@ -213,14 +213,15 @@ function Splash({ onContinue }: { onContinue: () => void }) {
         </Text>
 
         {/* 2 — Move cards in the middle */}
+        <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
         <View style={sp.previewOuter}>
-          <View style={[sp.miniCard, { borderLeftColor: "#A78BFA" }]}>
+          <View style={sp.miniCard}>
             <Text style={sp.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
           </View>
-          <View style={[sp.miniCard, { borderLeftColor: "#F97316" }]}>
+          <View style={sp.miniCard}>
             <Text style={sp.miniText}>🌮  Best birria in Koreatown — open now</Text>
           </View>
-          <View style={[sp.miniCard, { borderLeftColor: "#34D399" }]}>
+          <View style={sp.miniCard}>
             <Text style={sp.miniText}>🔭  Meteor shower at Griffith — 11PM</Text>
           </View>
         </View>
@@ -246,25 +247,32 @@ const sp = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
+  previewLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: PEACH,
+    letterSpacing: 1.4,
+    marginBottom: 10,
+  },
   previewOuter: {
-    marginTop: 24,
     backgroundColor: "#1C1C1E",
     borderRadius: 20,
-    padding: 16,
-    gap: 12,
+    padding: 14,
+    gap: 10,
   },
   miniCard: {
     backgroundColor: "#111111",
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 15,
     paddingHorizontal: 14,
     borderLeftWidth: 3,
+    borderLeftColor: PEACH,
   },
   miniText: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: WHITE,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   eyebrow: {
     fontSize: 10,
