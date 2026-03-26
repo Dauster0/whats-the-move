@@ -411,27 +411,16 @@ function PersonalizedResponse({
       <Text style={sc.headline}>{headline}</Text>
       <Text style={sc.body}>{body}</Text>
 
-      {/* Before / After cards */}
-      <View style={pr.cards}>
-        {/* Before */}
-        <View style={pr.card}>
-          <View style={pr.cardInner}>
-            <Text style={pr.cardEmoji}>📱</Text>
-            <Text style={pr.cardCopy}>Another night{"\n"}on the couch.</Text>
-          </View>
-          <Text style={pr.cardLabel}>Before</Text>
+      {/* App preview card */}
+      <View style={pr.previewOuter}>
+        <View style={[pr.miniCard, { borderLeftColor: "#A78BFA" }]}>
+          <Text style={pr.miniText}>🎵  Clairo at The Wiltern — Tonight 9PM</Text>
         </View>
-
-        {/* After — peach glow behind it */}
-        <View style={pr.afterWrap}>
-          <View style={pr.afterGlow} />
-          <View style={[pr.card, pr.cardAfter]}>
-            <View style={pr.cardInner}>
-              <Text style={pr.cardEmoji}>🔥</Text>
-              <Text style={[pr.cardCopy, pr.cardCopyAfter]}>A night worth{"\n"}talking about.</Text>
-            </View>
-            <Text style={[pr.cardLabel, pr.cardLabelAfter]}>After</Text>
-          </View>
+        <View style={[pr.miniCard, { borderLeftColor: "#F97316" }]}>
+          <Text style={pr.miniText}>🌮  Best birria in Koreatown — open now</Text>
+        </View>
+        <View style={[pr.miniCard, { borderLeftColor: "#34D399" }]}>
+          <Text style={pr.miniText}>🔭  Meteor shower at Griffith — 11PM</Text>
         </View>
       </View>
     </Shell>
@@ -439,70 +428,25 @@ function PersonalizedResponse({
 }
 
 const pr = StyleSheet.create({
-  cards: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 28,
-    flex: 1,
-  },
-  afterWrap: {
-    flex: 1,
-    position: "relative",
-  },
-  afterGlow: {
-    position: "absolute",
-    top: "20%",
-    left: "-15%",
-    right: "-15%",
-    bottom: "10%",
-    backgroundColor: PEACH,
-    opacity: 0.18,
-    borderRadius: 60,
-    // blur approximated with a large border radius spread
-  },
-  card: {
-    flex: 1,
-    borderRadius: 16,
+  previewOuter: {
+    marginTop: 32,
     backgroundColor: CARD,
-    overflow: "hidden",
-    paddingBottom: 14,
-  },
-  cardAfter: {
-    backgroundColor: "#2C1810",
-  },
-  cardInner: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingTop: 16,
-    paddingBottom: 12,
+    borderRadius: 20,
+    padding: 16,
     gap: 12,
   },
-  cardEmoji: {
-    fontSize: 48,
+  miniCard: {
+    backgroundColor: "#111111",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderLeftWidth: 3,
   },
-  cardCopy: {
-    fontSize: 12,
+  miniText: {
+    fontSize: 14,
     fontWeight: "600",
-    color: MUTED_LIGHT,
-    textAlign: "center",
-    lineHeight: 17,
-  },
-  cardCopyAfter: {
-    color: PEACH,
-  },
-  cardLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: MUTED,
-    textAlign: "center",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    paddingBottom: 2,
-  },
-  cardLabelAfter: {
-    color: PEACH,
+    color: WHITE,
+    letterSpacing: -0.2,
   },
 });
 
