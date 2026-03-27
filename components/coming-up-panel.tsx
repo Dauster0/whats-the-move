@@ -137,8 +137,6 @@ type Props = {
   timeBudget: ConciergeTimeBudget;
   deckWidth: number;
   deckHeight: number;
-  /** Only rendered for Plus users; controls server tier and learning features. */
-  isPlus: boolean;
 };
 
 export function ComingUpPanel({
@@ -148,7 +146,6 @@ export function ComingUpPanel({
   timeBudget,
   deckWidth,
   deckHeight,
-  isPlus,
 }: Props) {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
@@ -181,14 +178,10 @@ export function ComingUpPanel({
         const nowIso = new Date().toISOString();
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const baseExclude = await getExcludeSuggestionKeys();
-        let excludeSuggestionKeys = baseExclude;
-        let decayRecentNames: string[] = [];
-        if (isPlus) {
-          const decayKeys = await getDecayExcludedKeys();
-          excludeSuggestionKeys = [...new Set([...baseExclude, ...decayKeys])];
-          decayRecentNames = await getDecayContextForGpt();
-        }
-        const swipeSignals = isPlus ? await getSwipeSignalsForApi() : null;
+        const decayKeys = await getDecayExcludedKeys();
+        const excludeSuggestionKeys = [...new Set([...baseExclude, ...decayKeys])];
+        const decayRecentNames = await getDecayContextForGpt();
+        const swipeSignals = await getSwipeSignalsForApi();
 
         const res = await fetch(`${SERVER_URL}/concierge-ahead`, {
           method: "POST",
@@ -208,7 +201,7 @@ export function ComingUpPanel({
             ...(swipeSignals ? { swipeSignals } : {}),
             excludeSuggestionKeys,
             decayRecentNames,
-            conciergeTier: isPlus ? "plus" : "free",
+            conciergeTier: "plus",
             aheadWindow: w,
             ...(w === "date" && dateYmd ? { pickedDateYmd: dateYmd } : {}),
           }),
@@ -225,12 +218,11 @@ export function ComingUpPanel({
         const mapped = rawList.map((item: unknown) =>
           mapApiSuggestion(item && typeof item === "object" ? (item as Record<string, unknown>) : {})
         );
-        const list =
-          isPlus && mapped.length
-            ? filterSuggestionsByDecay(mapped, Date.now(), new Set(await getDecayExcludedKeys()))
-            : mapped;
+        const list = mapped.length
+          ? filterSuggestionsByDecay(mapped, Date.now(), new Set(await getDecayExcludedKeys()))
+          : mapped;
         setDecks((prev) => ({ ...prev, [w]: list }));
-        if (isPlus) void recordDecayDeckDisplayed(list);
+        void recordDecayDeckDisplayed(list);
         registerDeckKeys(list);
       } catch (e) {
         setErrors((prev) => ({
@@ -242,7 +234,7 @@ export function ComingUpPanel({
         setLoading((prev) => ({ ...prev, [w]: false }));
       }
     },
-    [preferences, energy, timeBudget, isPlus]
+    [preferences, energy, timeBudget]
   );
 
   const ensureLoaded = useCallback(
@@ -283,7 +275,7 @@ export function ComingUpPanel({
     (w: AheadWindowKey, s: ConciergeSuggestion, stack: ConciergeSuggestion[]) => {
       setPeekDetailHandlers({
         onNah: () => {
-          if (isPlus) void recordDecayRejected(s);
+          void recordDecayRejected(s);
           void recordSwipeSkip(s.category || "experience");
           void pushRecentConciergeTitle(s.title);
           persistSwipeForHistory(s);
@@ -292,7 +284,7 @@ export function ComingUpPanel({
           router.back();
         },
         onCommit: () => {
-          if (isPlus) void recordDecayCommitted(s);
+          void recordDecayCommitted(s);
           void recordSwipeCommit(s.category || "experience");
           persistSwipeForHistory(s);
           void addPlanningConciergeMove(s);
@@ -317,13 +309,13 @@ export function ComingUpPanel({
       });
       router.push("/concierge-detail");
     },
-    [popCard, isPlus]
+    [popCard]
   );
 
   const commitInterested = useCallback(
     (w: AheadWindowKey, s: ConciergeSuggestion) => {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (isPlus) void recordDecayCommitted(s);
+      void recordDecayCommitted(s);
       void recordSwipeCommit(s.category || "experience");
       persistSwipeForHistory(s);
       void addPlanningConciergeMove(s);
@@ -332,19 +324,19 @@ export function ComingUpPanel({
       else openMapsQuery(s.mapQuery || s.title);
       popCard(w, s);
     },
-    [popCard, isPlus]
+    [popCard]
   );
 
   const skipCard = useCallback(
     (w: AheadWindowKey, s: ConciergeSuggestion) => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      if (isPlus) void recordDecayRejected(s);
+      void recordDecayRejected(s);
       void recordSwipeSkip(s.category || "experience");
       void pushRecentConciergeTitle(s.title);
       persistSwipeForHistory(s);
       popCard(w, s);
     },
-    [popCard, isPlus]
+    [popCard]
   );
 
   const dateChoices = useMemo(() => {

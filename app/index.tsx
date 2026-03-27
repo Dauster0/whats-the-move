@@ -52,26 +52,6 @@ import {
   type SavedConciergeMove,
 } from "../lib/saved-concierge-storage";
 import {
-  canFreeUserDeckRefresh,
-  canShowPaywallAfterDismiss,
-  consumeDeckRefreshCredit,
-  dismissPaywall,
-  dismissThirdRefreshUpsell,
-  expireTrialIfNeeded,
-  isDevPlusUnlocked,
-  isPlusEffectiveOrDev,
-  isThirdRefreshUpsellDismissedToday,
-  isWildcardLocked,
-  loadEntitlements,
-  markFiveSessionUpsellShown,
-  markSharperPicksLineShown,
-  markTrialEndingBannerShown,
-  recordAppSessionOpen,
-  shouldShowSharperPicksLine,
-  shouldShowTrialEndingBanner,
-} from "../lib/plus-entitlements";
-import { usePlusEntitlements } from "../store/plus-context";
-import {
   filterSuggestionsByDecay,
   getDecayContextForGpt,
   getDecayExcludedKeys,
@@ -178,7 +158,6 @@ export default function HomeScreen() {
     return Math.max(420, Math.min(560, raw));
   }, [insets.top, insets.bottom]);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
-  const { isPlus, loaded: plusLoaded, refresh: refreshPlus } = usePlusEntitlements();
 
   const userInterestDeckChips = useMemo(() => {
     const sel = new Set(preferences.interests ?? []);
@@ -209,16 +188,9 @@ export default function HomeScreen() {
   suggestionsLenRef.current = suggestions.length;
   const suggestionsRef = useRef(suggestions);
   suggestionsRef.current = suggestions;
-  const trialPaywallShownRef = useRef(false);
-  const isPlusRef = useRef(isPlus);
-  isPlusRef.current = isPlus;
 
-  const [thirdRefreshModalVisible, setThirdRefreshModalVisible] = useState(false);
-  const [deckRefreshSoft, setDeckRefreshSoft] = useState(false);
   const [pendingRejection, setPendingRejection] = useState<{ category: string } | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [trialEndBannerVisible, setTrialEndBannerVisible] = useState(false);
-  const [sharperPicksBannerVisible, setSharperPicksBannerVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [postMoveCheckIn, setPostMoveCheckIn] = useState<{ title: string; category: string } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
@@ -245,7 +217,6 @@ export default function HomeScreen() {
   const fetchDeckList = useCallback(async (): Promise<ConciergeSuggestion[]> => {
     const prefs = preferencesRef.current;
     const ints = prefs.interests ?? [];
-    const plus = isPlusRef.current;
     if (ints.length === 0) {
       throw new Error("Pick at least one interest (⋯ menu → Interests) so we can suggest moves.");
     }
@@ -279,7 +250,7 @@ export default function HomeScreen() {
         recentSuggestions,
         excludeSuggestionKeys,
         decayRecentNames,
-        conciergeTier: plus ? "plus" : "free",
+        conciergeTier: "plus",
         userContextLine: buildUserContextLine(prefs),
         hungerPreference: prefs.hungerPreference ?? "any",
         ageRange: prefs.ageRange ?? "prefer_not",
@@ -318,42 +289,17 @@ export default function HomeScreen() {
         const place = loc.place || "near you";
         setAreaLabel(place);
 
-        if (!isPlusRef.current && (mode === "full" || mode === "refresh" || mode === "background")) {
-          const ok = await canFreeUserDeckRefresh();
-          if (!ok) {
-            if (mode !== "background") {
-              const ent = await loadEntitlements();
-              if (!isThirdRefreshUpsellDismissedToday(ent)) {
-                setThirdRefreshModalVisible(true);
-              }
-              setDeckRefreshSoft(true);
-              throw new Error("REFRESH_CAP");
-            }
-            return;
-          }
-        }
-
         const list = await fetchDeckList();
         if (mode === "background" && list.length === 0) return;
         pendingDeckRef.current = null;
         setSuggestions(list);
         registerDeckKeys(list);
-        setDeckRefreshSoft(false);
         if (list.length > 0 && !swipeHintShownRef.current) {
           swipeHintShownRef.current = true;
           setShowSwipeHint(true);
         }
 
-        if (!isPlusRef.current && (mode === "full" || mode === "refresh" || mode === "background")) {
-          const { justUsedThird } = await consumeDeckRefreshCredit();
-          if (justUsedThird) {
-            setThirdRefreshModalVisible(true);
-          }
-        }
-
-        if (isPlusRef.current) {
-          void recordDecayDeckDisplayed(list);
-        }
+        void recordDecayDeckDisplayed(list);
         setLeftDismissStreak(0);
         if (list.length === 0) {
           if (mode !== "background") setError("Nothing came back—try refresh.");
@@ -374,42 +320,16 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (!isLoaded || !hasFinishedOnboarding || !plusLoaded) return;
+    if (!isLoaded || !hasFinishedOnboarding) return;
     load("full");
-  }, [isLoaded, hasFinishedOnboarding, plusLoaded, energy, timeBudget, deckCategoryFocus, load]);
+  }, [isLoaded, hasFinishedOnboarding, energy, timeBudget, deckCategoryFocus, load]);
 
   useFocusEffect(
     useCallback(() => {
       void getSavedConciergeMoves().then(setSavedRows);
       const isFirstHomeFocus = !hasHadFocusOnce.current;
       void (async () => {
-        const ended = await expireTrialIfNeeded();
-        if (ended) await refreshPlus();
-        if (ended && !trialPaywallShownRef.current && !isDevPlusUnlocked()) {
-          trialPaywallShownRef.current = true;
-          router.push("/elsewhere-plus?source=trial_ended" as Href);
-        }
-        const ent = await recordAppSessionOpen();
-        await refreshPlus();
-        if (
-          !isFirstHomeFocus &&
-          !isPlusEffectiveOrDev(ent) &&
-          ent.sessionOpenCount >= 5 &&
-          !ent.fiveSessionUpsellShown &&
-          (await canShowPaywallAfterDismiss())
-        ) {
-          await markFiveSessionUpsellShown();
-          router.push("/elsewhere-plus?source=habit" as Href);
-        }
-        const latest = await loadEntitlements();
-        if (shouldShowTrialEndingBanner(latest)) {
-          setTrialEndBannerVisible(true);
-          void markTrialEndingBannerShown();
-        }
-        if (shouldShowSharperPicksLine(latest)) {
-          setSharperPicksBannerVisible(true);
-          void markSharperPicksLineShown();
-        }
+        /* Plus/trial logic removed */
       })();
       if (!isLoaded || !hasFinishedOnboarding) return;
       if (isFirstHomeFocus) {
@@ -421,7 +341,7 @@ export default function HomeScreen() {
       void getPendingCommittedCheckIn().then((pending) => {
         if (pending) setPostMoveCheckIn(pending);
       });
-    }, [isLoaded, hasFinishedOnboarding, load, refreshPlus])
+    }, [isLoaded, hasFinishedOnboarding, load])
   );
 
   useEffect(() => {
@@ -453,32 +373,17 @@ export default function HomeScreen() {
       pendingDeckRef.current = null;
       if (pending && pending.length > 0) {
         registerDeckKeys(pending);
-        if (isPlusRef.current) void recordDecayDeckDisplayed(pending);
+        void recordDecayDeckDisplayed(pending);
         setFindingMoreDeck(false);
         return pending;
       }
       setFindingMoreDeck(true);
       void (async () => {
         try {
-          if (!isPlusRef.current) {
-            const ok = await canFreeUserDeckRefresh();
-            if (!ok) {
-              setDeckRefreshSoft(true);
-              const ent = await loadEntitlements();
-              if (!isThirdRefreshUpsellDismissedToday(ent)) {
-                setThirdRefreshModalVisible(true);
-              }
-              return;
-            }
-          }
           const list = await fetchDeckList();
           registerDeckKeys(list);
-          if (isPlusRef.current) void recordDecayDeckDisplayed(list);
+          void recordDecayDeckDisplayed(list);
           setSuggestions(list);
-          if (!isPlusRef.current) {
-            const { justUsedThird } = await consumeDeckRefreshCredit();
-            if (justUsedThird) setThirdRefreshModalVisible(true);
-          }
         } catch {
           setError("Couldn’t load the next deck.");
         } finally {
@@ -500,10 +405,6 @@ export default function HomeScreen() {
     const prev = suggestionsRef.current;
     const s = prev[0];
     if (!s) return;
-    if (isWildcardLocked(s, isPlusRef.current)) {
-      openPlusPaywall("wildcard");
-      return;
-    }
     void recordDecayCommitted(s);
     void recordSwipeCommit(s.category || "experience");
     void saveCommittedMove(s.title, s.category || "experience");
@@ -525,14 +426,10 @@ export default function HomeScreen() {
     const stack = suggestionsRef.current;
     const s = stack[0];
     if (!s) return;
-    if (isWildcardLocked(s, isPlusRef.current)) {
-      openPlusPaywall("wildcard");
-      return;
-    }
     const others = stack.slice(1);
     setPeekDetailHandlers({
       onNah: () => {
-        if (isPlusRef.current) void recordDecayRejected(s);
+        void recordDecayRejected(s);
         void recordSwipeSkip(s.category || "experience");
         void pushRecentConciergeTitle(s.title);
         persistSwipeForHistory(s);
@@ -598,12 +495,10 @@ export default function HomeScreen() {
       const s = prev[0];
       if (!s) return prev;
       skippedCategory = s.category || "experience";
-      if (isPlusRef.current) void recordDecayRejected(s);
+      void recordDecayRejected(s);
       void recordSwipeSkip(skippedCategory);
-      if (!isWildcardLocked(s, isPlusRef.current)) {
-        void pushRecentConciergeTitle(s.title);
-        persistSwipeForHistory(s);
-      }
+      void pushRecentConciergeTitle(s.title);
+      persistSwipeForHistory(s);
       const next = prev.slice(1);
       if (next.length === 0) return applyNextDeckOrEmpty(prev);
       return next;
@@ -615,11 +510,7 @@ export default function HomeScreen() {
     setLeftDismissStreak((st) => {
       const n = st + 1;
       if (n >= 3) {
-        void (async () => {
-          if (isPlusRef.current || (await canFreeUserDeckRefresh())) {
-            void load("full");
-          }
-        })();
+        void load("full");
         return 0;
       }
       return n;
@@ -630,15 +521,9 @@ export default function HomeScreen() {
     const s = suggestions[0];
     if (!s) return;
     const wasSaved = await isConciergeMoveSaved(s);
-    const res = await toggleSavedConciergeMove(s, { plusUnlimited: isPlusRef.current });
-    if (res.blockedCap) {
-      openPlusPaywall("saved_cap");
-      return;
-    }
-    if (isPlusRef.current) {
-      if (res.saved && !wasSaved) void recordDecayBookmarkPinned(s);
-      if (!res.saved && wasSaved) void recordDecayBookmarkUnpinned(s);
-    }
+    const res = await toggleSavedConciergeMove(s, {});
+    if (res.saved && !wasSaved) void recordDecayBookmarkPinned(s);
+    if (!res.saved && wasSaved) void recordDecayBookmarkUnpinned(s);
     setBookmarkSaved(res.saved);
   }, [suggestions, openPlusPaywall]);
 
@@ -657,16 +542,12 @@ export default function HomeScreen() {
 
   const areaShort = areaLabel.split(",")[0]?.trim() || "your area";
 
-  const menuItems = useMemo(() => {
-    const rows: { label: string; href: Href }[] = [
-      { label: "What's the Move? Plus", href: "/elsewhere-plus?source=menu" },
-      { label: "Interests", href: "/edit-interests" },
-      { label: "Your details", href: "/my-context" },
-    ];
-    if (isPlus) rows.push({ label: "Planning", href: "/planning-moves" });
-    rows.push({ label: "Saved moves", href: "/saved-moves" });
-    return rows;
-  }, [isPlus]);
+  const menuItems = useMemo((): { label: string; href: Href }[] => [
+    { label: "Interests", href: "/edit-interests" },
+    { label: "Your details", href: "/my-context" },
+    { label: "Planning", href: "/planning-moves" },
+    { label: "Saved moves", href: "/saved-moves" },
+  ], []);
 
   if (!isLoaded) {
     return (
@@ -679,15 +560,6 @@ export default function HomeScreen() {
 
   if (!hasFinishedOnboarding) {
     return null;
-  }
-
-  if (!plusLoaded) {
-    return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.loadingText}>One sec.</Text>
-      </View>
-    );
   }
 
   return (
@@ -740,88 +612,6 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {trialEndBannerVisible ? (
-        <View style={[styles.subtleBanner, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-          <Text style={[styles.subtleBannerText, { color: colors.text }]}>
-            Your free trial ends in 2 days. Keep Plus for $7.99/month.
-          </Text>
-          <Pressable
-            onPress={() => {
-              void markTrialEndingBannerShown();
-              setTrialEndBannerVisible(false);
-            }}
-            hitSlop={8}
-          >
-            <Ionicons name="close" size={20} color={colors.textMuted} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {sharperPicksBannerVisible ? (
-        <View style={[styles.subtleBanner, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-          <Text style={[styles.subtleBannerText, { color: colors.text }]}>
-            Your picks are getting sharper. What’s the Move? has learned what you’re into.
-          </Text>
-          <Pressable
-            onPress={() => {
-              void markSharperPicksLineShown();
-              setSharperPicksBannerVisible(false);
-            }}
-            hitSlop={8}
-          >
-            <Ionicons name="close" size={20} color={colors.textMuted} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {!isPlus && deckRefreshSoft ? (
-        <View style={styles.softCapStrip}>
-          <Text style={[styles.softCapStripText, { color: colors.textMuted }]}>
-            Check back tomorrow — you’ve had a full day of fresh decks.
-          </Text>
-        </View>
-      ) : null}
-
-      <Modal
-        visible={thirdRefreshModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setThirdRefreshModalVisible(false)}
-      >
-        <View style={styles.upgradeModalRoot}>
-          <Pressable style={styles.menuBackdrop} onPress={() => setThirdRefreshModalVisible(false)} />
-          <View style={[styles.upgradeModalCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-            <Text style={[styles.upgradeModalTitle, { color: colors.text }]}>
-              You’ve read the room pretty hard today.
-            </Text>
-            <Text style={[styles.upgradeModalBody, { color: colors.textMuted }]}>
-              Get unlimited refreshes with Plus.
-            </Text>
-            <Pressable
-              style={[styles.upgradeModalPrimary, { backgroundColor: colors.accent }]}
-              onPress={() => {
-                setThirdRefreshModalVisible(false);
-                openPlusPaywall("refresh_cap");
-              }}
-            >
-              <Text style={[styles.upgradeModalPrimaryText, { color: colors.textInverse }]}>
-                Upgrade — $7.99/month
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.upgradeModalSecondary}
-              onPress={() => {
-                void dismissThirdRefreshUpsell();
-                void dismissPaywall();
-                setThirdRefreshModalVisible(false);
-                setDeckRefreshSoft(true);
-              }}
-            >
-              <Text style={[styles.upgradeModalSecondaryText, { color: colors.textMuted }]}>Maybe later</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={menuOpen}
@@ -902,35 +692,14 @@ export default function HomeScreen() {
       </View>
 
       {homeTab === "comingUp" ? (
-        isPlus ? (
-          <ComingUpPanel
-            colors={colors}
-            preferences={preferences}
-            energy={energy}
-            timeBudget={timeBudget}
-            deckWidth={DECK_W}
-            deckHeight={DECK_HEIGHT}
-            isPlus
-          />
-        ) : (
-          <View style={styles.comingUpLocked}>
-            <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
-            <Text style={[styles.comingUpLockedTitle, { color: colors.text }]}>
-              See what’s coming up in {areaShort}
-            </Text>
-            <Text style={[styles.comingUpLockedBody, { color: colors.textMuted }]}>
-              Concerts, events, and experiences worth planning for. Tonight, this weekend, or months out.
-            </Text>
-            <Pressable
-              style={[styles.comingUpLockedCta, { backgroundColor: colors.accent }]}
-              onPress={() => openPlusPaywall("coming_up")}
-            >
-              <Text style={[styles.comingUpLockedCtaText, { color: colors.textInverse }]}>
-                Start free trial
-              </Text>
-            </Pressable>
-          </View>
-        )
+        <ComingUpPanel
+          colors={colors}
+          preferences={preferences}
+          energy={energy}
+          timeBudget={timeBudget}
+          deckWidth={DECK_W}
+          deckHeight={DECK_HEIGHT}
+        />
       ) : homeTab === "forYou" ? (
       <>
       {filtersVisible ? <View style={styles.controlBlock}>
@@ -1091,13 +860,6 @@ export default function HomeScreen() {
         <View style={styles.loadingBlock}>
           {findingMoreDeck ? (
             <Text style={[styles.loadingSub, { textAlign: "center" }]}>Getting more…</Text>
-          ) : !isPlus && deckRefreshSoft ? (
-            <>
-              <Text style={styles.errorText}>Check back tomorrow</Text>
-              <Text style={[styles.loadingSub, { textAlign: "center" }]}>
-                You’ve seen plenty for today. A new day brings a new deck.
-              </Text>
-            </>
           ) : (
             <>
               <Text style={styles.errorText}>You’re caught up.</Text>
@@ -1128,8 +890,6 @@ export default function HomeScreen() {
                   imageGradientBottomColor={colors.bgCard}
                   colors={colors}
                   swipeMode
-                  wildcardLocked={isWildcardLocked(s, isPlus)}
-                  onLockedWildcardPress={isTop ? () => openPlusPaywall("wildcard") : undefined}
                   bookmarkSaved={isTop ? bookmarkSaved : false}
                   onBookmarkPress={isTop ? () => void onBookmarkToggle() : undefined}
                   onCardPress={isTop ? openPeekDetail : undefined}

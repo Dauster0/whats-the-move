@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -40,7 +40,6 @@ import {
   isConciergeMoveSaved,
   toggleSavedConciergeMove,
 } from "../lib/saved-concierge-storage";
-import { usePlusEntitlements } from "../store/plus-context";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.154:3001";
 const { width: WIN_W } = Dimensions.get("window");
@@ -109,7 +108,6 @@ function pickSimilar(others: ConciergeSuggestion[], current: ConciergeSuggestion
 export default function ConciergeDetailScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { isPlus } = usePlusEntitlements();
   const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   const [payload, setPayload] = useState<ConciergeDetailPayload | null>(null);
@@ -337,11 +335,7 @@ export default function ConciergeDetailScreen() {
   async function onToggleSave() {
     if (!suggestion) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const res = await toggleSavedConciergeMove(suggestion, { plusUnlimited: isPlus });
-    if (res.blockedCap) {
-      router.push("/elsewhere-plus?source=saved_cap" as Href);
-      return;
-    }
+    const res = await toggleSavedConciergeMove(suggestion, { plusUnlimited: true });
     setSaved(res.saved);
   }
 

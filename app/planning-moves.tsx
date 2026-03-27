@@ -1,11 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { router, useFocusEffect, type Href } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import { setConciergeDetailPayload } from "../lib/concierge-detail-storage";
-import { usePlusEntitlements } from "../store/plus-context";
 import {
   getPlanningConciergeMoves,
   type PlanningConciergeMove,
@@ -13,7 +12,6 @@ import {
 import { font, radius, spacing } from "../lib/theme";
 export default function PlanningMovesScreen() {
   const colors = useThemeColors();
-  const { isPlus, loaded: plusLoaded } = usePlusEntitlements();
   const [rows, setRows] = useState<PlanningConciergeMove[]>([]);
 
   const load = useCallback(() => {
@@ -22,41 +20,9 @@ export default function PlanningMovesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (isPlus) load();
-    }, [load, isPlus])
+      load();
+    }, [load])
   );
-
-  if (!plusLoaded) {
-    return (
-      <View style={[styles.scroll, { backgroundColor: colors.bg, justifyContent: "center", padding: spacing.lg }]}>
-        <Text style={{ color: colors.textMuted, textAlign: "center" }}>One sec.</Text>
-      </View>
-    );
-  }
-
-  if (!isPlus) {
-    return (
-      <ScrollView
-        style={[styles.scroll, { backgroundColor: colors.bg }]}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable style={styles.backRow} onPress={() => router.back()} hitSlop={12}>
-          <Text style={[styles.back, { color: colors.text }]}>← Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>Planning</Text>
-        <Text style={[styles.sub, { color: colors.textMuted }]}>
-          A Plus-only list for events you want to catch later — from Coming up, not today’s deck.
-        </Text>
-        <Pressable
-          style={[styles.cta, { backgroundColor: colors.accent }]}
-          onPress={() => router.push("/elsewhere-plus?source=planning" as Href)}
-        >
-          <Text style={[styles.ctaText, { color: colors.textInverse }]}>Start free trial</Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
 
   return (
     <ScrollView
@@ -132,11 +98,4 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: font.sizeMd, fontWeight: "700" },
   badge: { fontSize: 12, fontWeight: "700", marginTop: 4 },
-  cta: {
-    marginTop: spacing.lg,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    alignItems: "center",
-  },
-  ctaText: { fontSize: 16, fontWeight: "800" },
 });

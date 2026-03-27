@@ -1,6 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
-import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -90,9 +89,6 @@ type Props = {
   imageGradientBottomColor?: string;
   onBookmarkPress?: () => void;
   bookmarkSaved?: boolean;
-  /** Free tier: wildcard slot is visible but locked. */
-  wildcardLocked?: boolean;
-  onLockedWildcardPress?: () => void;
 };
 
 export function ConciergeHeroCard({
@@ -107,8 +103,6 @@ export function ConciergeHeroCard({
   imageGradientBottomColor = "#161412",
   onBookmarkPress,
   bookmarkSaved,
-  wildcardLocked,
-  onLockedWildcardPress,
 }: Props) {
   const pad = spacing.md;
   const innerW = width - pad * 2;
@@ -185,64 +179,25 @@ export function ConciergeHeroCard({
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
-      {wildcardLocked ? (
-        <View style={styles.lockOverlay} pointerEvents="none">
-          <View style={styles.lockCircle}>
-            <Ionicons name="lock-closed" size={26} color="rgba(255,255,255,0.95)" />
-          </View>
-        </View>
-      ) : null}
       {swipeMode ? (
         <View style={styles.imageCategoryRow} pointerEvents="none">
-          {wildcardLocked ? (
-            <Text style={styles.imageCategory}>Wildcard</Text>
-          ) : null}
-          {!wildcardLocked && s.dateBadge ? (
+          {s.dateBadge ? (
             <View style={styles.dateBadgePill}>
               <Text style={styles.dateBadgeText}>{s.dateBadge}</Text>
             </View>
           ) : null}
-          {!wildcardLocked && s.closesSoon ? (
+          {s.closesSoon ? (
             <View style={styles.closesSoonPill}>
               <Text style={styles.closesSoonText}>Closes soon</Text>
             </View>
           ) : null}
-          {!wildcardLocked ? <Text style={styles.imageCategory}>{s.category}</Text> : null}
+          <Text style={styles.imageCategory}>{s.category}</Text>
         </View>
       ) : null}
     </View>
   );
 
-  const lockedSwipeBody = (
-    <>
-      <Text style={styles.wildcardLockedTitle} numberOfLines={4}>
-        Something rare is happening near you tonight.
-      </Text>
-      <View style={styles.blurDescriptionWrap}>
-        <Text style={[styles.description, styles.descriptionSwipe, styles.blurSourceText]} numberOfLines={5}>
-          {displayDescription}
-        </Text>
-        <BlurView intensity={55} tint="dark" style={styles.blurAbsolute} />
-      </View>
-      <Pressable
-        style={[styles.unlockCta, { borderColor: colors.accent + "88" }]}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onLockedWildcardPress?.();
-        }}
-      >
-        <Text style={[styles.unlockCtaText, { color: colors.accent }]}>Unlock with Plus</Text>
-        <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
-      </Pressable>
-      <View style={styles.tagRow}>
-        <Text style={styles.tag}>Plus</Text>
-      </View>
-    </>
-  );
-
-  const textBodyInner = wildcardLocked && swipeMode ? (
-    lockedSwipeBody
-  ) : (
+  const textBodyInner = (
     <>
       {why && !swipeMode ? (
         <View style={[styles.whyBlock, { borderLeftColor: colors.accent }]}>
@@ -317,9 +272,6 @@ export function ConciergeHeroCard({
 
   const footerBlock = (
     <View style={[styles.textPanelFooter, swipeMode && styles.textPanelFooterSwipe]}>
-      {swipeMode && wildcardLocked ? (
-        <Text style={styles.swipeHintFooter}>Swipe left to skip · swipe right to see Plus</Text>
-      ) : null}
       {swipeMode ? null : ticketed ? (
         <View style={styles.ctaRow}>
           <Pressable
@@ -362,8 +314,8 @@ export function ConciergeHeroCard({
   );
 
   const cardPressProps = {
-    disabled: !onCardPress && !wildcardLocked,
-    onPress: wildcardLocked ? onLockedWildcardPress : onCardPress,
+    disabled: !onCardPress,
+    onPress: onCardPress,
   } as const;
 
   return (
@@ -380,7 +332,7 @@ export function ConciergeHeroCard({
         ]}
       >
         <View style={[styles.column, deckFit && styles.columnDeckFit]}>
-          {onBookmarkPress && !wildcardLocked ? (
+          {onBookmarkPress ? (
             <Pressable
               style={[styles.bookmarkHit, { backgroundColor: "rgba(0,0,0,0.45)" }]}
               onPress={() => {
@@ -401,7 +353,7 @@ export function ConciergeHeroCard({
               <Pressable
                 {...cardPressProps}
                 style={({ pressed }) => [
-                  pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                  pressed && onCardPress ? { opacity: 0.98 } : null,
                 ]}
               >
                 {imageBlock}
@@ -416,7 +368,7 @@ export function ConciergeHeroCard({
                 <Pressable
                   {...cardPressProps}
                   style={({ pressed }) => [
-                    pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                    pressed && onCardPress ? { opacity: 0.98 } : null,
                   ]}
                 >
                   <View style={[styles.textBody, styles.textBodySwipe]}>{textBodyInner}</View>
@@ -429,7 +381,7 @@ export function ConciergeHeroCard({
               <Pressable
                 {...cardPressProps}
                 style={({ pressed }) => [
-                  pressed && (onCardPress || wildcardLocked) ? { opacity: 0.98 } : null,
+                  pressed && onCardPress ? { opacity: 0.98 } : null,
                 ]}
               >
                 {imageBlock}
@@ -491,60 +443,6 @@ const styles = StyleSheet.create({
     width: "100%",
     overflow: "hidden",
     position: "relative",
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 6,
-  },
-  lockCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  wildcardLockedTitle: {
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: -0.3,
-    marginBottom: spacing.sm,
-  },
-  blurDescriptionWrap: {
-    position: "relative",
-    minHeight: 96,
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    marginBottom: spacing.md,
-  },
-  blurSourceText: {
-    opacity: 0.22,
-    paddingHorizontal: 2,
-  },
-  blurAbsolute: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  unlockCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    alignSelf: "stretch",
-    marginBottom: spacing.sm,
-  },
-  unlockCtaText: {
-    fontSize: 15,
-    fontWeight: "800",
   },
   posterStage: {
     ...StyleSheet.absoluteFillObject,
