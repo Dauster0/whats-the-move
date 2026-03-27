@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { router } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { ConciergeHeroCard } from "../components/concierge-hero-card";
 import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
@@ -994,13 +995,13 @@ function LocationScreen({
       onBack={onBack}
     >
       <View style={lo.iconWrap}>
-        {/* Pulse ring */}
         <Animated.View
           style={[
             lo.pulse,
             { transform: [{ scale: pulseScale }], opacity: pulseOpacity },
           ]}
         />
+        <Ionicons name="location" size={38} color={PEACH} style={{ zIndex: 1 }} />
       </View>
 
       <Text style={sc.headline}>{"Where are you\nright now?"}</Text>
@@ -1466,27 +1467,31 @@ const bu = StyleSheet.create({
 
 type SocialStyle = "solo" | "small_group" | "big_group" | "depends" | null;
 
-const SOCIAL_OPTIONS: { key: SocialStyle; label: string; sub: string; confirm: string }[] = [
+const SOCIAL_OPTIONS: { key: SocialStyle; icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; confirm: string }[] = [
   {
     key: "solo",
+    icon: "headset",
     label: "Flying solo",
     sub: "I do my best stuff alone or I'm usually on my own",
     confirm: "Some of the best moves are better alone anyway.",
   },
   {
     key: "small_group",
+    icon: "people",
     label: "Small circle",
     sub: "One or two people I actually like",
     confirm: "We'll find moves worth sharing.",
   },
   {
     key: "big_group",
+    icon: "bonfire",
     label: "Big energy",
     sub: "The more people the better",
     confirm: "We'll find moves worth texting the whole group about.",
   },
   {
     key: "depends",
+    icon: "shuffle",
     label: "Depends on the vibe",
     sub: "",
     confirm: "We'll read the room.",
@@ -1529,6 +1534,12 @@ function SocialBattery({
               style={[sb.card, active && sb.cardActive]}
               activeOpacity={0.75}
             >
+              <Ionicons
+                name={opt.icon}
+                size={22}
+                color={active ? PEACH : MUTED_LIGHT}
+                style={sb.icon}
+              />
               <View style={sb.cardText}>
                 <Text style={[sb.label, active && sb.labelActive]}>{opt.label}</Text>
                 {opt.sub ? (
@@ -1638,7 +1649,7 @@ function NotificationsScreen({
       {/* Notification mockup card */}
       <View style={no.mockCard}>
         <View style={no.mockIcon}>
-          <Text style={no.mockIconText}>!</Text>
+          <Ionicons name="notifications" size={22} color={PEACH} />
         </View>
         <View style={no.mockBody}>
           <Text style={no.mockApp}>What's the Move</Text>
