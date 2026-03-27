@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { ConciergeHeroCard } from "../components/concierge-hero-card";
 import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
@@ -1362,10 +1363,10 @@ function MidSell({
       onContinue={onContinue}
       onBack={onBack}
     >
-      {/* Image placeholder */}
-      <View style={ms.imgCard}>
-        <View style={ms.imgInner} />
-      </View>
+      <LinearGradient
+        colors={["#2C1810", "#1a1a1a"]}
+        style={ms.imgCard}
+      />
 
       <Text style={[sc.headline, { marginTop: 24 }]}>{headline}</Text>
       <Text style={sc.body}>{body}</Text>
@@ -1378,13 +1379,7 @@ const ms = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     height: 180,
-    backgroundColor: "#1A1610",
     marginTop: 8,
-  },
-  imgInner: {
-    flex: 1,
-    backgroundColor: "#221C14",
-    opacity: 0.8,
   },
 });
 
@@ -2112,11 +2107,8 @@ function Payoff({
 
   return (
     <View style={[py.root]}>
-      {/* Hero image — top 70% */}
-      <View style={py.hero}>
-        <View style={py.heroBg} />
-        {/* Gradient overlay on bottom half */}
-        <View style={py.heroGradient} />
+      {/* Hero — top 70% */}
+      <LinearGradient colors={["#2C1810", "#1a1a1a"]} style={py.hero}>
         {/* Text over gradient */}
         <View style={py.heroText}>
           <Text style={py.headline}>
@@ -2147,19 +2139,6 @@ const py = StyleSheet.create({
     height: "70%",
     overflow: "hidden",
     position: "relative",
-  },
-  heroBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#1A1410",
-  },
-  heroGradient: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "60%",
-    backgroundColor: BG,
-    opacity: 0.85,
   },
   heroText: {
     position: "absolute",
