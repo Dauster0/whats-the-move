@@ -1,6 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { router } from "expo-router";
+import { ConciergeHeroCard } from "../components/concierge-hero-card";
+import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
+import type { ConciergeSuggestion } from "../lib/concierge-types";
+import { getColors } from "../lib/theme";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -27,6 +31,67 @@ const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
 const TOTAL_STEPS = 17;
+const DEMO_DECK_H = Math.round(H * 0.52);
+
+const DEMO_DECK: ConciergeSuggestion[] = [
+  {
+    title: "Clairo at The Wiltern",
+    description: "Indie pop — small venue, intimate show",
+    category: "event",
+    timeRequired: "2 hrs",
+    energyLevel: "medium",
+    address: "",
+    startTime: "",
+    venueName: "",
+    mapQuery: "",
+    unsplashQuery: "",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: "https://picsum.photos/seed/wtm-concert/700/420",
+    deckRole: "event",
+    kind: "event",
+  },
+  {
+    title: "Birrieria Chalio",
+    description: "Best birria in Koreatown, open until 3am",
+    category: "eat",
+    timeRequired: "45 min",
+    energyLevel: "low",
+    address: "",
+    startTime: "",
+    venueName: "",
+    mapQuery: "",
+    unsplashQuery: "",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: "https://picsum.photos/seed/wtm-tacos/700/420",
+    deckRole: "food",
+    kind: "place",
+  },
+  {
+    title: "Meteor Shower at Griffith",
+    description: "Peaks at 11pm, free, rare",
+    category: "experience",
+    timeRequired: "2 hrs",
+    energyLevel: "low",
+    address: "",
+    startTime: "",
+    venueName: "",
+    mapQuery: "",
+    unsplashQuery: "",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: "https://picsum.photos/seed/wtm-stars/700/420",
+    deckRole: "experience",
+    kind: "experience",
+  },
+];
 
 // ─── Shared Shell ────────────────────────────────────────────────────────────
 
@@ -505,20 +570,6 @@ const pr = StyleSheet.create({
 
 // ─── Screen 4 — Social Proof ──────────────────────────────────────────────────
 
-const QUOTES = [
-  {
-    text: "I had no idea there was a grunion run at Cabrillo Beach that night. Went at midnight. One of the best nights I've had in LA.",
-    attr: "Tyler, Los Angeles",
-  },
-  {
-    text: "Showed up alone to a comedy show two blocks from my dorm. Left with plans for the next three weekends.",
-    attr: "Maya, USC",
-  },
-  {
-    text: "Found a rooftop bar I'd driven past a hundred times and never noticed. Now it's my favorite spot in the city.",
-    attr: "Jordan, Silver Lake",
-  },
-];
 
 function SocialProof({
   onContinue,
@@ -527,6 +578,22 @@ function SocialProof({
   onContinue: () => void;
   onBack: () => void;
 }) {
+  const [demoDeck, setDemoDeck] = useState<ConciergeSuggestion[]>(DEMO_DECK);
+  const colors = getColors(true);
+  const deckColors = {
+    accent: colors.accent,
+    text: colors.text,
+    textMuted: colors.textMuted,
+    textInverse: colors.textInverse,
+  };
+
+  function cycleCard() {
+    setDemoDeck((prev) => {
+      const [first, ...rest] = prev;
+      return [...rest, first];
+    });
+  }
+
   return (
     <Shell
       step={3}
@@ -534,61 +601,52 @@ function SocialProof({
       continueLabel="I want that →"
       onContinue={onContinue}
       onBack={onBack}
-      scrollable
     >
-      <Text style={sc.headline}>{"This is what\nit looks like."}</Text>
-      <Text style={sc.subhead}>Real moves. Real people. Real nights.</Text>
-
-      <View style={sq.list}>
-        {QUOTES.map((q, i) => (
-          <View key={i} style={sq.card}>
-            <View style={sq.accent} />
-            <View style={sq.cardBody}>
-              <Text style={sq.quote}>"{q.text}"</Text>
-              <Text style={sq.attr}>— {q.attr}</Text>
-            </View>
-          </View>
-        ))}
+      <Text style={sq.tonightLabel}>TONIGHT NEAR YOU</Text>
+      <View style={sq.deckWrap}>
+        <ConciergeSwipeDeck
+          suggestions={demoDeck}
+          width={W}
+          height={DEMO_DECK_H}
+          colors={deckColors}
+          onSwipeRight={cycleCard}
+          onSwipeLeft={cycleCard}
+          renderCard={(s) => (
+            <ConciergeHeroCard
+              suggestion={s}
+              width={W}
+              deckMaxHeight={DEMO_DECK_H}
+              imageGradientBottomColor={colors.bgCard}
+              colors={colors}
+              swipeMode
+              onOpenMaps={() => {}}
+              onOpenTickets={() => {}}
+            />
+          )}
+        />
       </View>
+      <Text style={sq.swipeHint}>Swipe to explore →</Text>
     </Shell>
   );
 }
 
 const sq = StyleSheet.create({
-  list: {
-    gap: 14,
-    marginTop: 24,
-    paddingBottom: 12,
-  },
-  card: {
-    backgroundColor: CARD,
-    borderRadius: 16,
-    flexDirection: "row",
-    overflow: "hidden",
-  },
-  accent: {
-    width: 4,
-    backgroundColor: PEACH,
-    borderRadius: 2,
-    margin: 16,
-    marginRight: 0,
-    alignSelf: "stretch",
-  },
-  cardBody: {
-    flex: 1,
-    padding: 16,
-  },
-  quote: {
-    fontSize: 14,
-    color: "#D0D0D0",
-    lineHeight: 21,
+  tonightLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: PEACH,
+    letterSpacing: 1.4,
     marginBottom: 10,
-    fontStyle: "italic",
   },
-  attr: {
+  deckWrap: {
+    marginHorizontal: -24,
+    height: DEMO_DECK_H,
+  },
+  swipeHint: {
     fontSize: 12,
     color: MUTED,
-    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 10,
   },
 });
 
