@@ -32,7 +32,7 @@ const CARD = "#1C1C1E";
 const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
-const TOTAL_STEPS = 19;
+const TOTAL_STEPS = 18;
 const DEMO_DECK_H = Math.round(H * 0.52);
 
 const DEMO_DECK: ConciergeSuggestion[] = [
@@ -459,134 +459,9 @@ function personalizedCopy(style: FreeNightStyle): { headline: string; body: stri
   };
 }
 
-function PersonalizedResponse({
-  freeNightStyle,
-  onContinue,
-  onBack,
-}: {
-  freeNightStyle: FreeNightStyle;
-  onContinue: () => void;
-  onBack: () => void;
-}) {
-  const { headline, body } = personalizedCopy(freeNightStyle);
+// ─── Screen 3 — Demo Preview (combined) ──────────────────────────────────────
 
-  return (
-    <Shell
-      step={2}
-      canContinue={true}
-      continueLabel="Keep going →"
-      onContinue={onContinue}
-      onBack={onBack}
-    >
-      <Text style={sc.headline}>{headline}</Text>
-      <Text style={sc.body}>{body}</Text>
-
-      {/* App preview — mini move cards */}
-      <View style={pr.stack}>
-        {/* Concert */}
-        <View style={pr.card}>
-          <View style={[pr.imageZone, { backgroundColor: "#0d1526" }]}>
-            <Text style={pr.category}>LIVE MUSIC</Text>
-          </View>
-          <View style={pr.body}>
-            <Text style={pr.title}>Clairo at The Wiltern</Text>
-            <View style={pr.tagRow}>
-              <Text style={pr.tag}>Tonight</Text>
-              <Text style={pr.tag}>9 PM</Text>
-            </View>
-          </View>
-        </View>
-        {/* Food */}
-        <View style={pr.card}>
-          <View style={[pr.imageZone, { backgroundColor: "#3d2918" }]}>
-            <Text style={pr.category}>FOOD & DRINK</Text>
-          </View>
-          <View style={pr.body}>
-            <Text style={pr.title}>Best birria in Koreatown</Text>
-            <View style={pr.tagRow}>
-              <Text style={pr.tag}>Open now</Text>
-            </View>
-          </View>
-        </View>
-        {/* Outdoor */}
-        <View style={pr.card}>
-          <View style={[pr.imageZone, { backgroundColor: "#14261c" }]}>
-            <Text style={pr.category}>OUTDOOR</Text>
-          </View>
-          <View style={pr.body}>
-            <Text style={pr.title}>Meteor shower at Griffith</Text>
-            <View style={pr.tagRow}>
-              <Text style={pr.tag}>11 PM</Text>
-              <Text style={pr.tag}>Tonight</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Shell>
-  );
-}
-
-const pr = StyleSheet.create({
-  stack: {
-    marginTop: 28,
-    gap: 10,
-  },
-  card: {
-    backgroundColor: "#161412",
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  imageZone: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  emoji: {
-    fontSize: 22,
-  },
-  category: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  body: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: WHITE,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  tagRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  tag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.75)",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-});
-
-// ─── Screen 4 — Social Proof ──────────────────────────────────────────────────
-
-
-function SocialProof({
+function DemoPreview({
   onContinue,
   onBack,
 }: {
@@ -611,14 +486,16 @@ function SocialProof({
 
   return (
     <Shell
-      step={3}
+      step={2}
       canContinue={true}
-      continueLabel="I want that →"
+      continueLabel="Keep going"
       onContinue={onContinue}
       onBack={onBack}
     >
-      <Text style={sq.tonightLabel}>TONIGHT NEAR YOU</Text>
-      <View style={sq.deckWrap}>
+      <Text style={sc.headline}>Imagine figuring it out instantly.</Text>
+      <Text style={sc.body}>{"You're already good at this.\nWhat's the Move makes you great at it."}</Text>
+
+      <View style={dp.deckWrap}>
         <ConciergeSwipeDeck
           suggestions={demoDeck}
           width={W}
@@ -640,22 +517,16 @@ function SocialProof({
           )}
         />
       </View>
-      <Text style={sq.swipeHint}>Swipe to explore →</Text>
+      <Text style={dp.swipeHint}>Swipe to explore</Text>
     </Shell>
   );
 }
 
-const sq = StyleSheet.create({
-  tonightLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: PEACH,
-    letterSpacing: 1.4,
-    marginBottom: 10,
-  },
+const dp = StyleSheet.create({
   deckWrap: {
     marginHorizontal: -24,
     height: DEMO_DECK_H,
+    marginTop: 20,
   },
   swipeHint: {
     fontSize: 12,
@@ -2163,8 +2034,8 @@ const py = StyleSheet.create({
 
 // Maps internal step index → Shell progress step, accounting for email skip
 function shellStep(internal: number, emailChosen: boolean): number {
-  if (internal <= 4) return internal;
-  if (internal === 5) return 5; // email confirm, always step 5
+  if (internal <= 3) return internal;
+  if (internal === 4) return 4; // email confirm, always step 4
   return emailChosen ? internal : internal - 1;
 }
 
@@ -2195,9 +2066,9 @@ export default function OnboardingScreen() {
   }
 
   function goBack() {
-    if (step === 6 && !emailChosen) {
+    if (step === 5 && !emailChosen) {
       // skipped email, back from location → back to create account
-      setStep(4);
+      setStep(3);
     } else {
       setStep((s) => Math.max(0, s - 1));
     }
@@ -2205,12 +2076,12 @@ export default function OnboardingScreen() {
 
   function handleEmailChosen() {
     setEmailChosen(true);
-    setStep(5); // email confirm
+    setStep(4); // email confirm
   }
 
   function handleSocialChosen() {
     setEmailChosen(false);
-    setStep(6); // skip email confirm, go to location
+    setStep(5); // skip email confirm, go to location
   }
 
   async function finish() {
@@ -2263,7 +2134,7 @@ export default function OnboardingScreen() {
     });
 
     // Advance to payoff screen — the button there does the final navigate
-    setStep(19);
+    setStep(18);
   }
 
   const ss = shellStep(step, emailChosen);
@@ -2279,17 +2150,9 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 2) return (
-    <PersonalizedResponse
-      freeNightStyle={freeNightStyle}
-      onContinue={goNext}
-      onBack={goBack}
-    />
-  );
+  if (step === 2) return <DemoPreview onContinue={goNext} onBack={goBack} />;
 
-  if (step === 3) return <SocialProof onContinue={goNext} onBack={goBack} />;
-
-  if (step === 4) return (
+  if (step === 3) return (
     <CreateAccount
       shellStep={ss}
       onEmail={handleEmailChosen}
@@ -2298,7 +2161,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 5) return (
+  if (step === 4) return (
     <EmailConfirm
       shellStep={ss}
       onContinue={goNext}
@@ -2306,7 +2169,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 6) return (
+  if (step === 5) return (
     <LocationScreen
       shellStep={ss}
       onContinue={goNext}
@@ -2316,7 +2179,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 7) return (
+  if (step === 6) return (
     <AgeScreen
       shellStep={ss}
       value={userAge}
@@ -2326,7 +2189,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 8) return (
+  if (step === 7) return (
     <GenderScreen
       shellStep={ss}
       value={userGender}
@@ -2338,7 +2201,7 @@ export default function OnboardingScreen() {
 
   const neighborhood = userNeighborhood || "your area";
 
-  if (step === 9) return (
+  if (step === 8) return (
     <MidSell
       shellStep={ss}
       userAge={userAge}
@@ -2349,9 +2212,9 @@ export default function OnboardingScreen() {
     />
   );
 
-  // Steps 10–14 — Interests (5 screens A–E)
-  if (step >= 10 && step <= 14) {
-    const screenIdx = step - 10;
+  // Steps 9–13 — Interests (5 screens A–E)
+  if (step >= 9 && step <= 13) {
+    const screenIdx = step - 9;
     const screen = INTEREST_SCREENS[screenIdx];
     const sections = screen.sectionIndexes.map((i) => USER_INTEREST_SECTIONS[i]);
     return (
@@ -2361,7 +2224,7 @@ export default function OnboardingScreen() {
         headline={screen.headline}
         selected={userInterests}
         onToggle={toggleInterest}
-        isLast={step === 14}
+        isLast={step === 13}
         onContinue={goNext}
         onSkip={goNext}
         onBack={goBack}
@@ -2369,7 +2232,7 @@ export default function OnboardingScreen() {
     );
   }
 
-  if (step === 15) return (
+  if (step === 14) return (
     <BudgetScreen
       shellStep={ss}
       value={userBudget}
@@ -2379,7 +2242,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 16) return (
+  if (step === 15) return (
     <SocialBattery
       shellStep={ss}
       value={userSocialStyle}
@@ -2389,7 +2252,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 17) return (
+  if (step === 16) return (
     <NotificationsScreen
       shellStep={ss}
       onContinue={goNext}
@@ -2397,7 +2260,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 18) return (
+  if (step === 17) return (
     <SetupScreen
       shellStep={ss}
       userNeighborhood={neighborhood}
@@ -2408,7 +2271,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  // Step 19 — Payoff (navigated to after finish() saves data)
+  // Step 18 — Payoff (navigated to after finish() saves data)
   return (
     <Payoff
       userNeighborhood={neighborhood}
