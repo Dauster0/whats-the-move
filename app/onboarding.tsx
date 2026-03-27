@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { ConciergeHeroCard } from "../components/concierge-hero-card";
+import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
+import type { ConciergeSuggestion } from "../lib/concierge-types";
+import { getColors } from "../lib/theme";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -28,8 +31,68 @@ const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
 const TOTAL_STEPS = 17;
-const DECK_CARD_H = 170; // height of each preview card
-const DECK_PEEK = 22;    // how many px of each back card peek below the front
+const SPLASH_DECK_H = 310;
+
+const DEMO_DECK: ConciergeSuggestion[] = [
+  {
+    title: "Clairo at The Wiltern",
+    description: "Indie pop — small venue, intimate show",
+    category: "Event",
+    timeRequired: "2 hrs",
+    energyLevel: "medium",
+    address: "3790 Wilshire Blvd, Los Angeles",
+    startTime: "9 PM",
+    venueName: "The Wiltern",
+    mapQuery: "The Wiltern Los Angeles",
+    unsplashQuery: "concert venue night",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: null,
+    deckRole: "event",
+    kind: "event",
+  },
+  {
+    title: "Birrieria Chalio",
+    description: "Best birria in Koreatown, open until 3am",
+    category: "Eat",
+    timeRequired: "45 min",
+    energyLevel: "low",
+    address: "Koreatown, Los Angeles",
+    startTime: "Open now",
+    venueName: "",
+    mapQuery: "Birrieria Chalio Los Angeles",
+    unsplashQuery: "birria tacos",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: null,
+    deckRole: "food",
+    kind: "place",
+    placeOpenNow: true,
+  },
+  {
+    title: "Meteor Shower at Griffith",
+    description: "Peaks at 11pm, free, rare",
+    category: "Experience",
+    timeRequired: "Low energy",
+    energyLevel: "low",
+    address: "Griffith Observatory, Los Angeles",
+    startTime: "11 PM",
+    venueName: "Griffith Observatory",
+    mapQuery: "Griffith Observatory Los Angeles",
+    unsplashQuery: "night sky stars",
+    whyNow: "",
+    ticketUrl: "",
+    ticketEventId: "",
+    sourcePlaceName: "",
+    photoUrl: null,
+    deckRole: "experience",
+    kind: "experience",
+  },
+];
 
 // ─── Shared Shell ────────────────────────────────────────────────────────────
 
@@ -199,82 +262,63 @@ const sh = StyleSheet.create({
 
 // ─── Screen 1 — Splash ───────────────────────────────────────────────────────
 
-function SplashDeckCard({
-  gradient,
-  category,
-  title,
-  description,
-  tags,
-  style,
-}: {
-  gradient: readonly [string, string, ...string[]];
-  category: string;
-  title: string;
-  description: string;
-  tags: string[];
-  style?: object;
-}) {
-  return (
-    <View style={[sp.dc, style]}>
-      <LinearGradient colors={gradient} style={sp.dcImage}>
-        <Text style={sp.dcCat}>{category}</Text>
-      </LinearGradient>
-      <View style={sp.dcBody}>
-        <Text style={sp.dcTitle}>{title}</Text>
-        <Text style={sp.dcDesc} numberOfLines={2}>{description}</Text>
-        <View style={sp.dcTags}>
-          {tags.map((t) => <Text key={t} style={sp.dcTag}>{t}</Text>)}
-        </View>
-      </View>
-    </View>
-  );
-}
-
 function Splash({ onContinue }: { onContinue: () => void }) {
   const insets = useSafeAreaInsets();
+  const [demoDeck, setDemoDeck] = useState<ConciergeSuggestion[]>(DEMO_DECK);
+  const colors = getColors(true);
+  const deckColors = {
+    accent: colors.accent,
+    text: colors.text,
+    textMuted: colors.textMuted,
+    textInverse: colors.textInverse,
+  };
+
+  function cycleCard() {
+    setDemoDeck((prev) => {
+      const [first, ...rest] = prev;
+      return [...rest, first];
+    });
+  }
+
   return (
     <View style={sp.root}>
       <StatusBar barStyle="light-content" />
 
-      {/* 1 — Headline */}
       <View style={[sp.upper, { paddingTop: insets.top + 24 }]}>
-        <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
-        <Text style={sp.headline}>
-          {"Something good\nis happening\nnear you tonight."}
-        </Text>
-        <Text style={sp.body}>
-          {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
-        </Text>
-
-        {/* 2 — Deck preview */}
-        <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
-        {/* Cards rendered back → front so front card (Clairo) is on top */}
-        <View style={sp.deckWrap}>
-          <SplashDeckCard
-            gradient={["#0d2620", "#061a12"]}
-            category="EXPERIENCE"
-            title="Meteor Shower at Griffith"
-            description="Peaks at 11pm, free, rare"
-            tags={["Tonight 11PM", "low"]}
-            style={{ top: DECK_PEEK * 2, zIndex: 1 }}
-          />
-          <SplashDeckCard
-            gradient={["#3d1e08", "#1a0a02"]}
-            category="EAT"
-            title="Best Birria in Koreatown"
-            description="Open until 3am, cash only, worth it"
-            tags={["Open now", "45 min"]}
-            style={{ top: DECK_PEEK, zIndex: 2 }}
-          />
-          <SplashDeckCard
-            gradient={["#0d1526", "#1a0d3d"]}
-            category="EVENT"
-            title="Clairo at The Wiltern"
-            description="Indie pop — small venue, intimate show"
-            tags={["Tonight 9PM", "2 hours"]}
-            style={{ top: 0, zIndex: 3 }}
-          />
+        {/* 1 — Headline */}
+        <View style={sp.textPad}>
+          <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
+          <Text style={sp.headline}>
+            {"Something good\nis happening\nnear you tonight."}
+          </Text>
+          <Text style={sp.body}>
+            {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
+          </Text>
+          <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
         </View>
+
+        {/* 2 — Real swipe deck */}
+        <ConciergeSwipeDeck
+          suggestions={demoDeck}
+          width={W}
+          height={SPLASH_DECK_H}
+          colors={deckColors}
+          onSwipeRight={cycleCard}
+          onSwipeLeft={cycleCard}
+          renderCard={(s) => (
+            <ConciergeHeroCard
+              suggestion={s}
+              width={W}
+              deckMaxHeight={SPLASH_DECK_H}
+              imageGradientBottomColor={colors.bgCard}
+              colors={colors}
+              swipeMode
+              onOpenMaps={() => {}}
+              onOpenTickets={() => {}}
+            />
+          )}
+        />
+        <Text style={sp.swipeHint}>Swipe to preview →</Text>
       </View>
 
       {/* 3 — Button pinned to bottom */}
@@ -295,6 +339,9 @@ const sp = StyleSheet.create({
   },
   upper: {
     flex: 1,
+    overflow: "hidden",
+  },
+  textPad: {
     paddingHorizontal: 24,
   },
   eyebrow: {
@@ -316,86 +363,26 @@ const sp = StyleSheet.create({
     fontSize: 15,
     color: MUTED_LIGHT,
     lineHeight: 22,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   previewLabel: {
     fontSize: 10,
     fontWeight: "700",
     color: PEACH,
     letterSpacing: 1.4,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  // Deck container — fixed height so cards can stack via absolute position
-  deckWrap: {
-    position: "relative",
-    height: DECK_CARD_H + DECK_PEEK * 2,
-  },
-  // Each deck card — absolutely positioned inside deckWrap
-  dc: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: DECK_CARD_H,
-    backgroundColor: "#161412",
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  dcImage: {
-    height: DECK_CARD_H * 0.52,
-    justifyContent: "flex-end",
-    paddingHorizontal: 14,
-    paddingBottom: 10,
-  },
-  dcCat: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.75)",
-    letterSpacing: 1.3,
-    textTransform: "uppercase",
-  },
-  dcBody: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  dcTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: WHITE,
-    letterSpacing: -0.3,
-    marginBottom: 4,
-  },
-  dcDesc: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.6)",
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  dcTags: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  dcTag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.75)",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    overflow: "hidden",
+  swipeHint: {
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 10,
+    paddingHorizontal: 24,
   },
   bottom: {
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 16,
   },
   btn: {
     backgroundColor: PEACH,
