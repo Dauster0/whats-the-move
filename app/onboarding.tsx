@@ -495,7 +495,7 @@ function DemoPreview({
       <Text style={sc.headline}>Imagine figuring it out instantly.</Text>
       <Text style={sc.body}>{"You're already good at this.\nWhat's the Move makes you great at it."}</Text>
 
-      <View style={dp.deckWrap}>
+      <View style={dv.deckWrap}>
         <ConciergeSwipeDeck
           suggestions={demoDeck}
           width={W}
@@ -517,12 +517,12 @@ function DemoPreview({
           )}
         />
       </View>
-      <Text style={dp.swipeHint}>Swipe to explore</Text>
+      <Text style={dv.swipeHint}>Swipe to explore</Text>
     </Shell>
   );
 }
 
-const dp = StyleSheet.create({
+const dv = StyleSheet.create({
   deckWrap: {
     marginHorizontal: -24,
     height: DEMO_DECK_H,
