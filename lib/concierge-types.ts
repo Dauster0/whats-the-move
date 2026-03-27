@@ -58,6 +58,8 @@ export type ConciergeSuggestion = {
   fandangoFallbackUrl?: string;
   /** Coming Up tab / planning — short date label on card */
   dateBadge?: string;
+  /** "21+" | "18+" | "all ages" | null — from TM, Google Places types, or GPT */
+  ageRestriction?: "21+" | "18+" | "all ages" | null;
 };
 
 

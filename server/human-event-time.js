@@ -50,18 +50,15 @@ function formatClock12InTz(ms, tz) {
   }
 }
 
-function formatShortWeekdayMonthDayAtClock(eventMs, tz) {
+function formatMonthDayAtClock(eventMs, tz) {
   try {
-    const wd = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(
-      new Date(eventMs)
-    );
     const md = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
       month: "short",
       day: "numeric",
     }).format(new Date(eventMs));
     const clock = formatClock12InTz(eventMs, tz);
-    return `${wd}, ${md} at ${clock}`;
+    return `${md} at ${clock}`;
   } catch {
     return formatClock12InTz(eventMs, tz);
   }
@@ -101,7 +98,10 @@ export function startMsFromFlatTicketmasterRecord(e) {
 }
 
 /**
- * Plain-language event time (not "Thu, Mar 26, 2:30 AM" on deck pills).
+ * Plain-language event time for deck cards and detail screen.
+ *
+ * "Tonight" rule: events starting midnight–6am count as tonight
+ * when the current local hour is 18 or later (going-out session).
  */
 export function formatHumanGoingOutTime(nowMs, eventStartMs, timeZone) {
   if (eventStartMs == null || Number.isNaN(eventStartMs) || !timeZone) return "";
@@ -112,16 +112,16 @@ export function formatHumanGoingOutTime(nowMs, eventStartMs, timeZone) {
   const clock = formatClock12InTz(eventStartMs, timeZone);
   if (!clock) return "";
   const eventH = hourInTimeZone(eventStartMs, timeZone);
+  const nowH = hourInTimeZone(nowMs, timeZone);
 
-  if (diff < 0) {
-    return formatShortWeekdayMonthDayAtClock(eventStartMs, timeZone);
-  }
   if (diff === 0) {
-    if (eventH >= 17 || eventH < 4) return `Tonight at ${clock}`;
+    // Evening or after-midnight early morning → "Tonight"
+    if (eventH >= 18 || eventH < 6) return `Tonight at ${clock}`;
     return `Today at ${clock}`;
   }
   if (diff === 1) {
-    if (eventH >= 0 && eventH < 4) return `Tonight at ${clock}`;
+    // After-midnight show on the next calendar day — still "tonight" if we're past 6pm
+    if (eventH < 6 && nowH >= 18) return `Tonight at ${clock}`;
     return `Tomorrow at ${clock}`;
   }
   if (diff >= 2 && diff <= 7) {
@@ -131,5 +131,6 @@ export function formatHumanGoingOutTime(nowMs, eventStartMs, timeZone) {
     }).format(new Date(eventStartMs));
     return `${dayName} at ${clock}`;
   }
-  return formatShortWeekdayMonthDayAtClock(eventStartMs, timeZone);
+  // > 7 days out or past events: short month/day without year or weekday abbreviation
+  return formatMonthDayAtClock(eventStartMs, timeZone);
 }

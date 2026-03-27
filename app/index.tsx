@@ -139,6 +139,9 @@ function mapApiConciergeSuggestion(x: Record<string, unknown>): ConciergeSuggest
     isTimeSensitive: x.isTimeSensitive === true,
     distanceText: x.distanceText != null ? String(x.distanceText) : undefined,
     dateBadge: x.dateBadge != null ? String(x.dateBadge) : undefined,
+    ageRestriction: (x.ageRestriction === "21+" || x.ageRestriction === "18+" || x.ageRestriction === "all ages")
+      ? x.ageRestriction as "21+" | "18+" | "all ages"
+      : null,
   };
 }
 

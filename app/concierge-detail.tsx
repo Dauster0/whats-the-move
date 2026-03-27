@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import { buildBookingActions } from "../lib/booking-links";
+import { truncateEventTitle } from "../lib/truncate-card-copy";
 import {
   clearConciergeDetailPayload,
   consumePendingConciergeDetail,
@@ -81,6 +82,7 @@ type DetailApi = {
   resale?: { stubhub: string; seatgeek: string; queryUsed?: string } | null;
   resaleUrl?: string;
   quickSnapshot?: unknown;
+  ageRestriction?: "21+" | "18+" | "all ages" | null;
   error?: string;
 };
 
@@ -309,7 +311,7 @@ export default function ConciergeDetailScreen() {
       ? [suggestion.photoUrl]
       : [];
 
-  const title = detail?.title || suggestion?.title || "Details";
+  const title = truncateEventTitle(detail?.title || suggestion?.title || "Details");
   const primary = detail?.primaryCta;
 
   async function onShare() {
@@ -504,6 +506,13 @@ export default function ConciergeDetailScreen() {
             <Text style={styles.metaChip}>{detail?.category || suggestion?.category}</Text>
             <Text style={styles.metaChip}>{detail?.energyLevel || suggestion?.energyLevel}</Text>
             <Text style={styles.metaChip}>{detail?.timeRequired || suggestion?.timeRequired}</Text>
+            {(() => {
+              const age = detail?.ageRestriction ?? suggestion?.ageRestriction;
+              if (!age) return null;
+              return (
+                <Text style={styles.ageChip}>{age}</Text>
+              );
+            })()}
           </View>
 
           {detail?.rating != null ? (
@@ -892,6 +901,16 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
       fontWeight: "700",
       color: colors.textSub,
       textTransform: "lowercase",
+    },
+    ageChip: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: colors.bg,
+      backgroundColor: colors.text,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+      overflow: "hidden",
     },
     rating: { marginTop: spacing.sm, fontSize: font.sizeMd, color: colors.text, fontWeight: "600" },
     badgeWhy: {

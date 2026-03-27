@@ -219,17 +219,15 @@ export function MoveProvider({ children }: { children: ReactNode }) {
           PREFERENCES_STORAGE_KEY,
           JSON.stringify(preferences)
         );
-        await AsyncStorage.setItem(
-          ONBOARDING_STORAGE_KEY,
-          String(hasFinishedOnboarding)
-        );
+        // Onboarding key is written directly by finish() and resetOnboarding()
+        // — never here, to avoid race conditions overwriting "true" with "false".
       } catch (error) {
         console.log("Failed to save app data", error);
       }
     }
 
     saveAll();
-  }, [completedMoves, preferences, hasFinishedOnboarding, isLoaded]);
+  }, [completedMoves, preferences, isLoaded]);
 
   function addCompletedMove(
     move: string,
@@ -269,6 +267,7 @@ export function MoveProvider({ children }: { children: ReactNode }) {
   function resetOnboarding() {
     setPreferencesState(DEFAULT_PREFERENCES);
     setHasFinishedOnboarding(false);
+    void AsyncStorage.multiRemove([ONBOARDING_STORAGE_KEY, "hasCompletedOnboarding"]);
   }
 
   const streakCount = calculateStreak(completedMoves);

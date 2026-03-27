@@ -31,16 +31,6 @@ function StackWithTheme() {
 }
 
 export default function RootLayout() {
-  // TEMP: clear onboarding storage so app launches from Screen 1.
-  // Remove this useEffect when done testing.
-  useEffect(() => {
-    AsyncStorage.multiRemove([
-      "has_finished_onboarding",
-      "hasCompletedOnboarding",
-      "user_preferences_v3",
-    ]);
-  }, []);
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <MoveProvider>

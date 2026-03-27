@@ -15,7 +15,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
-import { truncateToTwoSentences } from "../lib/truncate-card-copy";
+import { truncateEventTitle, truncateToTwoSentences } from "../lib/truncate-card-copy";
 import { colorsLight, font, radius, spacing } from "../lib/theme";
 
 type ThemeColors = typeof colorsLight;
@@ -116,7 +116,8 @@ export function ConciergeHeroCard({
   const ticketed = Boolean((s.ticketUrl || "").trim());
   const venue = (s.venueName || "").trim();
   const why = (s.whyNow || "").trim();
-  const displayTitle = (isMovie && s.movieTitle ? s.movieTitle : s.title) || s.title;
+  const rawTitle = (isMovie && s.movieTitle ? s.movieTitle : s.title) || s.title;
+  const displayTitle = truncateEventTitle(rawTitle);
   const subLine = (s.theaterSubtitle || "").trim() || (ticketed && venue ? venue : "");
 
   const [imgLoaded, setImgLoaded] = useState(!s.photoUrl);

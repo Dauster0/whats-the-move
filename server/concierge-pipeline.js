@@ -223,6 +223,18 @@ function isTmDiscoveryEventCancelledOrBad(e) {
   return false;
 }
 
+function parseTmAgeRestriction(ar) {
+  if (!ar || typeof ar !== "object") return null;
+  const restricted = typeof ar.restrictedAge === "number" ? ar.restrictedAge : null;
+  if (restricted != null) {
+    if (restricted >= 21) return "21+";
+    if (restricted >= 18) return "18+";
+    return "all ages";
+  }
+  if (ar.legalAgeEnforced === true) return "21+";
+  return null;
+}
+
 function mapTmDiscoveryEventToRecord(e) {
   const v = e?._embedded?.venues?.[0];
   const name = String(e?.name ?? "").trim();
@@ -240,6 +252,7 @@ function mapTmDiscoveryEventToRecord(e) {
     segment: e?.classifications?.[0]?.segment?.name ?? "",
     genre: e?.classifications?.[0]?.genre?.name ?? "",
     priceLabel: formatTmPriceRanges(e?.priceRanges),
+    ageRestriction: parseTmAgeRestriction(e?.ageRestrictions),
     images: Array.isArray(e?.images) ? e.images : [],
     attractions: (e?._embedded?.attractions ?? []).map((a) => ({
       name: a?.name ?? "",
@@ -598,6 +611,38 @@ function filterClosedVenuePlaces(suggestions, nearbyPlaces, planningAhead = fals
   return out;
 }
 
+/**
+ * Main deck hard rule: events must be actionable RIGHT NOW.
+ *
+ * - Reject if it started more than 60 minutes ago (already over or nearly over).
+ * - Reject if it starts more than 90 minutes from now (belongs in Coming Up tab).
+ *
+ * Non-TM suggestions (places, GPT knowledge) are never rejected here.
+ */
+function filterEventsByTimeWindow(suggestions, ticketmasterRecords, nowMs) {
+  const byId = new Map(ticketmasterRecords.map((r) => [r.id, r]));
+  const MAX_AHEAD_MS = 90 * 60 * 1000;  // 90 min
+  const MAX_PAST_MS  = 60 * 60 * 1000;  // 60 min
+  return suggestions.filter((s) => {
+    const eventId = String(s.ticketEventId || "").trim();
+    if (!eventId) return true; // not a TM event — place or GPT, pass through
+    const rec = byId.get(eventId);
+    if (!rec) return true; // no record to check — pass through conservatively
+    const evMs = tmRecordStartMs(rec);
+    if (evMs == null || Number.isNaN(evMs)) return true; // no timestamp — pass through
+    const diff = evMs - nowMs; // positive = future, negative = past
+    if (diff > MAX_AHEAD_MS) {
+      console.log("[deck filter] Rejected — too far out:", s.title, s.startTime, `(starts in ${Math.round(diff / 60000)} min)`);
+      return false;
+    }
+    if (diff < -MAX_PAST_MS) {
+      console.log("[deck filter] Rejected — already over:", s.title, s.startTime, `(started ${Math.round(-diff / 60000)} min ago)`);
+      return false;
+    }
+    return true;
+  });
+}
+
 function attachPlaceResourceNames(suggestions, nearbyPlaces) {
   return suggestions.map((s) => {
     if (String(s.sourceType || "").toLowerCase() === "gpt_knowledge") return s;
@@ -609,33 +654,9 @@ function attachPlaceResourceNames(suggestions, nearbyPlaces) {
   });
 }
 
-/** Ban model copy that hedges about whether a show exists. */
 const TM_HEDGE_RE =
   /even if|no show|might not be|may not be|in case (something|a show)|just in case|whether or not|if there'?s (no|a) show|check out .* for live|generic live music|something might be on|last-?minute|their calendar|worth a visit|soak in|catch a show at|ambient|calendar for/i;
 
-function formatTicketmasterStartLine(e) {
-  if (e.startIso) {
-    try {
-      const d = new Date(e.startIso);
-      if (!Number.isNaN(d.getTime())) {
-        return d.toLocaleString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        });
-      }
-    } catch {
-      /* */
-    }
-  }
-  if (e.localDate) {
-    const t = e.localTime ? ` ${e.localTime}` : "";
-    return `${e.localDate}${t}`.trim();
-  }
-  return "";
-}
 
 /**
  * Concert / ticketed-show cards must map to a real Ticketmaster row.
@@ -678,21 +699,11 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel, nowMs, 
     const venue = String(e.venue || s.venueName || "").trim();
     const show = String(e.name || "").trim();
     const title = venue ? `${show} at ${venue}`.slice(0, 120) : show.slice(0, 120);
-    const when = formatTicketmasterStartLine(e);
-    const whenLab = String(e.whenLabel || "").trim();
-    const whenLead =
-      whenLab && whenLab !== "Tonight" && when
-        ? `${whenLab} — ${when}`
-        : whenLab && whenLab !== "Tonight" && !when
-          ? whenLab
-          : when;
     const evMs = tmRecordStartMs(e);
     const humanStart =
       timeZone && evMs != null && !Number.isNaN(nowMs)
         ? formatHumanGoingOutTime(nowMs, evMs, timeZone)
         : "";
-    const genre = String(e.genre || "").trim();
-    const seg = String(e.segment || "").trim();
     const priceBit = String(e.priceLabel || "").trim();
     // Prefer GPT's description if it's more than just the event name repeated back
     const gptDesc = String(s.description || "").trim();
@@ -700,9 +711,8 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel, nowMs, 
     const descParts = gptDescIsUseful
       ? [gptDesc, priceBit ? ` Tickets from ${priceBit}.` : ""]
       : [
-          show + ".",
-          whenLead ? ` ${whenLead}.` : "",
-          venue ? ` ${venue}.` : "",
+          // Title has the show name; startTime tag has the time — don't repeat either here.
+          venue ? `${venue}.` : "",
           priceBit ? ` Tickets from ${priceBit}.` : "",
         ];
     const description = descParts.join("").replace(/\s+/g, " ").trim().slice(0, 400);
@@ -724,6 +734,7 @@ function mergeCanonicalTicketmasterCopy(suggestions, records, areaLabel, nowMs, 
       startTime: String(humanStart || when || s.startTime || "").trim().slice(0, 80),
       category: "event",
       cost: String(costLine || s.cost || "").slice(0, 48),
+      ...(e.ageRestriction ? { ageRestriction: e.ageRestriction } : {}),
     };
   });
 }
@@ -758,12 +769,21 @@ function attachPlaceMeta(suggestions, nearbyPlaces, nowIso) {
       const mi = Math.round(place.distanceMiles * 10) / 10;
       distanceText = `~${mi} mi`;
     }
+    // Infer age restriction from Google place types if GPT/TM didn't already set one
+    let ageRestriction = s.ageRestriction ?? null;
+    if (!ageRestriction) {
+      const types = Array.isArray(place.types) ? place.types : [];
+      if (types.includes("night_club") || types.includes("casino")) {
+        ageRestriction = "21+";
+      }
+    }
     return {
       ...s,
       placeOpenNow: place.openNow != null ? place.openNow : null,
       closesSoon,
       ...(openUntil ? { openUntil } : {}),
       ...(distanceText ? { distanceText } : {}),
+      ...(ageRestriction ? { ageRestriction } : {}),
     };
   });
 }
@@ -994,6 +1014,15 @@ function wallPartsFromIso(iso, tz) {
   }
 }
 
+function normalizeAgeRestriction(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (s === "21+" || s === "21") return "21+";
+  if (s === "18+" || s === "18") return "18+";
+  if (s === "all ages" || s === "all_ages" || s === "allages") return "all ages";
+  return null;
+}
+
 function normalizeSuggestions(raw) {
   if (!raw || typeof raw !== "object") return [];
   const arr = raw.suggestions;
@@ -1047,12 +1076,13 @@ function normalizeSuggestions(raw) {
       isTimeSensitive: Boolean(s.isTimeSensitive),
       distanceText: String(s.distanceText || "").slice(0, 120),
       dateBadge: String(s.dateBadge || s.date_badge || "").trim().slice(0, 40),
+      ageRestriction: normalizeAgeRestriction(s.ageRestriction),
     };
     if (placeId && placeId.startsWith("places/")) {
       row.googlePlaceResourceName = placeId.slice(0, 256);
     }
     out.push(row);
-    if (out.length >= 3) break;
+    if (out.length >= 5) break;
   }
   return out;
 }
@@ -1260,6 +1290,9 @@ export async function runConciergeRecommendations(body) {
     timeZone
   );
   if (suggestions.length === 0) suggestions = beforeGrounding;
+
+  // Hard time-window gate — after TM copy merged so ticketEventId is set
+  suggestions = filterEventsByTimeWindow(suggestions, ticketmasterRecords, nowMs);
 
   const beforeInterestMeal = suggestions.slice();
   suggestions = filterMuseumInterestPolicy(suggestions, interests, ticketmasterRecords, nearbyPlaces);
