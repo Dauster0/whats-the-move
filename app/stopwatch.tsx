@@ -272,7 +272,7 @@ export default function StopwatchScreen() {
           onPress={toggle}
         >
           <Text style={styles.toggleButtonText}>
-            {isRunning ? "⏸ Pause timer" : "▶ Start timer"}
+            {isRunning ? "Pause timer" : "Start timer"}
           </Text>
         </Pressable>
 

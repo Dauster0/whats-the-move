@@ -18,7 +18,6 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../hooks/use-theme-colors";
 import type { ConciergeEnergy, ConciergeSuggestion, ConciergeTimeBudget } from "../lib/concierge-types";
-import { DECK_FOCUS_EMOJI } from "../lib/deck-category-chips";
 import { USER_INTEREST_CHIPS } from "../lib/user-interests";
 import { font, radius, spacing } from "../lib/theme";
 import { getReadableLocation } from "../lib/location";
@@ -562,7 +561,7 @@ export default function HomeScreen() {
     return null;
   }
 
-  const energyLabel = energy === "low" ? "🌙 Low" : energy === "high" ? "🚀 High" : "⚡ Mid";
+  const energyLabel = energy === "low" ? "Low" : energy === "high" ? "High" : "Mid";
   const timeLabel = timeBudget === "30min" ? "~30 min" : timeBudget === "allday" ? "No rush" : "1–3 hrs";
   const hungerPref = preferences.hungerPreference ?? "any";
   const hungerLabel = hungerPref === "hungry" ? "Hungry" : hungerPref === "not_hungry" ? "Not hungry" : "Either";
@@ -802,7 +801,6 @@ export default function HomeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               {userInterestDeckChips.map(({ key, label }) => {
-                const emoji = DECK_FOCUS_EMOJI[key] ?? "✨";
                 const active = deckCategoryFocus === key;
                 return (
                   <Pressable
@@ -817,7 +815,7 @@ export default function HomeScreen() {
                       style={[styles.categoryChipText, active && styles.categoryChipTextActive]}
                       numberOfLines={1}
                     >
-                      {emoji} {label}
+                      {label}
                     </Text>
                   </Pressable>
                 );
@@ -833,7 +831,7 @@ export default function HomeScreen() {
           onPress={() => Linking.openSettings()}
         >
           <Text style={styles.locationBannerText}>
-            📍 Enable location for better picks — tap to open Settings
+            Enable location for better picks — tap to open Settings
           </Text>
         </Pressable>
       ) : null}
@@ -1025,11 +1023,11 @@ export default function HomeScreen() {
           <View style={styles.checkInRow}>
             {(
               [
-                { emoji: "👍", label: "Loved it" },
-                { emoji: "😐", label: "It was ok" },
-                { emoji: "👎", label: "Didn't go" },
+                { label: "Loved it" },
+                { label: "It was ok" },
+                { label: "Didn't go" },
               ] as const
-            ).map(({ emoji, label }) => (
+            ).map(({ label }) => (
               <Pressable
                 key={label}
                 style={[styles.checkInOption, { borderColor: colors.border, backgroundColor: colors.bg }]}
@@ -1039,7 +1037,6 @@ export default function HomeScreen() {
                   setPostMoveCheckIn(null);
                 }}
               >
-                <Text style={styles.checkInEmoji}>{emoji}</Text>
                 <Text style={[styles.checkInOptionText, { color: colors.text }]}>{label}</Text>
               </Pressable>
             ))}

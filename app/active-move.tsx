@@ -8,11 +8,6 @@ import { useMoveStore } from "../store/move-context";
 
 type MoveCategory = "micro" | "short" | "social";
 
-const CATEGORY_EMOJI: Record<MoveCategory, string> = {
-  micro: "⚡",
-  short: "🌍",
-  social: "👥",
-};
 
 export default function ActiveMoveScreen() {
   const {
@@ -144,7 +139,6 @@ export default function ActiveMoveScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.completeCard}>
-          <Text style={styles.completeEmoji}>✓</Text>
           <Text style={styles.completeTitle}>Nice.</Text>
           <Text style={styles.completeMove}>{safeMove}</Text>
           <Text style={styles.completeSub}>
@@ -194,7 +188,6 @@ export default function ActiveMoveScreen() {
         </Pressable>
 
         <View style={styles.categoryTag}>
-          <Text style={styles.categoryEmoji}>{CATEGORY_EMOJI[safeCategory]}</Text>
           <Text style={styles.categoryText}>{safeCategory}</Text>
         </View>
       </View>

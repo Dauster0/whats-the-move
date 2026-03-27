@@ -181,7 +181,6 @@ export function DeckButtons({
         onPress={onNah}
         hitSlop={12}
       >
-        <Text style={[styles.nahGlyph, { color: colors.textMuted }]}>✕</Text>
         <Text style={[styles.nahLabel, { color: colors.textMuted }]}>Nah</Text>
       </Pressable>
       <Pressable

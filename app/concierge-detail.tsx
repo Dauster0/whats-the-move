@@ -533,29 +533,29 @@ export default function ConciergeDetailScreen() {
             <Pressable
               onPress={() => openMapsQuery(detail.logistics?.mapQuery || detail.logistics!.address!)}
             >
-              <Text style={styles.logLine}>📍 {detail.logistics.address}</Text>
+              <Text style={styles.logLine}>{detail.logistics.address}</Text>
             </Pressable>
           ) : null}
           {detail?.logistics?.hoursLine ? (
-            <Text style={styles.logLine}>🕐 {detail.logistics.hoursLine}</Text>
+            <Text style={styles.logLine}>{detail.logistics.hoursLine}</Text>
           ) : null}
           {detail?.logistics?.timeLine || suggestion?.startTime ? (
-            <Text style={styles.logLine}>🕐 {detail?.logistics?.timeLine || suggestion?.startTime}</Text>
+            <Text style={styles.logLine}>{detail?.logistics?.timeLine || suggestion?.startTime}</Text>
           ) : null}
           {detail?.logistics?.duration || suggestion?.timeRequired ? (
-            <Text style={styles.logLine}>⏱ {detail?.logistics?.duration || suggestion?.timeRequired}</Text>
+            <Text style={styles.logLine}>{detail?.logistics?.duration || suggestion?.timeRequired}</Text>
           ) : null}
           {detail?.logistics?.distanceText ? (
-            <Text style={styles.logLine}>📍 {detail.logistics.distanceText}</Text>
+            <Text style={styles.logLine}>{detail.logistics.distanceText}</Text>
           ) : null}
           {detail?.logistics?.driveTimeText ? (
-            <Text style={styles.logLine}>🚗 {detail.logistics.driveTimeText}</Text>
+            <Text style={styles.logLine}>{detail.logistics.driveTimeText}</Text>
           ) : null}
           {detail?.logistics?.parking ? (
-            <Text style={styles.logLine}>🅿️ {detail.logistics.parking}</Text>
+            <Text style={styles.logLine}>{detail.logistics.parking}</Text>
           ) : null}
           {detail?.logistics?.weatherLine ? (
-            <Text style={styles.logLine}>🌤 {detail.logistics.weatherLine}</Text>
+            <Text style={styles.logLine}>{detail.logistics.weatherLine}</Text>
           ) : null}
 
           {detail?.resale?.stubhub && detail?.resale?.seatgeek ? (
@@ -712,7 +712,7 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onNah();
                 }}
               >
-                <Text style={[styles.peekBtnNahText, { color: colors.text }]}>✕ Not for me</Text>
+                <Text style={[styles.peekBtnNahText, { color: colors.text }]}>Not for me</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -727,7 +727,7 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onCommit();
                 }}
               >
-                <Text style={[styles.peekBtnGoText, { color: colors.textInverse }]}>✓ I’m going</Text>
+                <Text style={[styles.peekBtnGoText, { color: colors.textInverse }]}>I’m going</Text>
               </Pressable>
             </View>
             <Pressable

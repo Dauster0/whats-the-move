@@ -469,7 +469,6 @@ function PersonalizedResponse({
         {/* Concert */}
         <View style={pr.card}>
           <View style={[pr.imageZone, { backgroundColor: "#0d1526" }]}>
-            <Text style={pr.emoji}>🎵</Text>
             <Text style={pr.category}>LIVE MUSIC</Text>
           </View>
           <View style={pr.body}>
@@ -483,7 +482,6 @@ function PersonalizedResponse({
         {/* Food */}
         <View style={pr.card}>
           <View style={[pr.imageZone, { backgroundColor: "#3d2918" }]}>
-            <Text style={pr.emoji}>🌮</Text>
             <Text style={pr.category}>FOOD & DRINK</Text>
           </View>
           <View style={pr.body}>
@@ -496,7 +494,6 @@ function PersonalizedResponse({
         {/* Outdoor */}
         <View style={pr.card}>
           <View style={[pr.imageZone, { backgroundColor: "#14261c" }]}>
-            <Text style={pr.emoji}>🔭</Text>
             <Text style={pr.category}>OUTDOOR</Text>
           </View>
           <View style={pr.body}>
@@ -926,7 +923,7 @@ function CreateAccount({
           onPress={() => handleSocial("apple")}
           activeOpacity={0.75}
         >
-          <Text style={ca.authIcon}>🍎</Text>
+          <Text style={ca.authIcon}>A</Text>
           <Text style={ca.authText}>Continue with Apple</Text>
         </Pressable>
 
@@ -940,7 +937,7 @@ function CreateAccount({
         </Pressable>
 
         <Pressable style={ca.authBtn} onPress={onEmail} activeOpacity={0.75}>
-          <Text style={ca.authIcon}>📧</Text>
+          <Text style={ca.authIcon}>@</Text>
           <Text style={ca.authText}>Continue with Email</Text>
         </Pressable>
       </View>
@@ -1002,7 +999,6 @@ function EmailConfirm({
       onBack={onBack}
     >
       <View style={ec.center}>
-        <Text style={ec.icon}>✉️</Text>
       </View>
       <Text style={[sc.headline, { textAlign: "center" }]}>
         Check your email.
@@ -1117,7 +1113,6 @@ function LocationScreen({
             { transform: [{ scale: pulseScale }], opacity: pulseOpacity },
           ]}
         />
-        <Text style={lo.pin}>📍</Text>
       </View>
 
       <Text style={sc.headline}>{"Where are you\nright now?"}</Text>
@@ -1132,7 +1127,7 @@ function LocationScreen({
         activeOpacity={0.75}
       >
         <Text style={lo.btnText}>
-          {granted ? "✓  Location locked in" : requesting ? "Getting location…" : "📍  Use my location"}
+          {granted ? "Location locked in" : requesting ? "Getting location…" : "Use my location"}
         </Text>
       </Pressable>
 
@@ -1386,45 +1381,45 @@ const ms = StyleSheet.create({
 // ─── Screen 12 — Interests Part 1 ────────────────────────────────────────────
 
 const INTERESTS_1 = [
-  { key: "live_music", label: "🎵 Live music" },
-  { key: "food",       label: "🍜 Food" },
-  { key: "beach",      label: "🌊 Beach" },
-  { key: "comedy",     label: "🎭 Comedy" },
-  { key: "coffee",     label: "☕ Coffee" },
-  { key: "hiking",     label: "🥾 Hiking" },
-  { key: "bowling",    label: "🎳 Bowling" },
-  { key: "arcade",     label: "🎮 Arcade" },
-  { key: "nightlife",  label: "🌃 Nightlife" },
-  { key: "sports",     label: "🏀 Sports" },
-  { key: "books",      label: "📚 Books" },
-  { key: "art",        label: "🎨 Art" },
-  { key: "dancing",    label: "💃 Dancing" },
-  { key: "late_night", label: "🌮 Late night" },
-  { key: "movies",     label: "🎬 Movies" },
-  { key: "pickleball", label: "🏓 Pickleball" },
-  { key: "karaoke",    label: "🎤 Karaoke" },
-  { key: "stargazing", label: "🔭 Stargazing" },
+  { key: "live_music", label: "Live music" },
+  { key: "food",       label: "Food" },
+  { key: "beach",      label: "Beach" },
+  { key: "comedy",     label: "Comedy" },
+  { key: "coffee",     label: "Coffee" },
+  { key: "hiking",     label: "Hiking" },
+  { key: "bowling",    label: "Bowling" },
+  { key: "arcade",     label: "Arcade" },
+  { key: "nightlife",  label: "Nightlife" },
+  { key: "sports",     label: "Sports" },
+  { key: "books",      label: "Books" },
+  { key: "art",        label: "Art" },
+  { key: "dancing",    label: "Dancing" },
+  { key: "late_night", label: "Late night" },
+  { key: "movies",     label: "Movies" },
+  { key: "pickleball", label: "Pickleball" },
+  { key: "karaoke",    label: "Karaoke" },
+  { key: "stargazing", label: "Stargazing" },
 ];
 
 const INTERESTS_2 = [
-  { key: "festivals",  label: "🎪 Festivals" },
-  { key: "wine_bars",  label: "🍷 Wine bars" },
-  { key: "surfing",    label: "🏄 Surfing" },
-  { key: "trivia",     label: "🎯 Trivia" },
-  { key: "yoga",       label: "🧘 Yoga" },
-  { key: "boxing",     label: "🥊 Boxing" },
-  { key: "improv",     label: "🎸 Improv" },
-  { key: "markets",    label: "🌸 Markets" },
-  { key: "popups",     label: "🎡 Pop-ups" },
-  { key: "cycling",    label: "🚴 Cycling" },
-  { key: "climbing",   label: "🧗 Climbing" },
-  { key: "golf",       label: "⛳ Golf" },
-  { key: "theater",    label: "🎭 Theater" },
-  { key: "breweries",  label: "🍻 Breweries" },
-  { key: "exploring",  label: "🗺 Exploring" },
-  { key: "volleyball", label: "🏐 Volleyball" },
-  { key: "dessert",    label: "🍦 Dessert" },
-  { key: "events",     label: "🎠 Events" },
+  { key: "festivals",  label: "Festivals" },
+  { key: "wine_bars",  label: "Wine bars" },
+  { key: "surfing",    label: "Surfing" },
+  { key: "trivia",     label: "Trivia" },
+  { key: "yoga",       label: "Yoga" },
+  { key: "boxing",     label: "Boxing" },
+  { key: "improv",     label: "Improv" },
+  { key: "markets",    label: "Markets" },
+  { key: "popups",     label: "Pop-ups" },
+  { key: "cycling",    label: "Cycling" },
+  { key: "climbing",   label: "Climbing" },
+  { key: "golf",       label: "Golf" },
+  { key: "theater",    label: "Theater" },
+  { key: "breweries",  label: "Breweries" },
+  { key: "exploring",  label: "Exploring" },
+  { key: "volleyball", label: "Volleyball" },
+  { key: "dessert",    label: "Dessert" },
+  { key: "events",     label: "Events" },
 ];
 
 function InterestGrid({
@@ -1610,31 +1605,27 @@ const bu = StyleSheet.create({
 
 type SocialStyle = "solo" | "small_group" | "big_group" | "depends" | null;
 
-const SOCIAL_OPTIONS: { key: SocialStyle; icon: string; label: string; sub: string; confirm: string }[] = [
+const SOCIAL_OPTIONS: { key: SocialStyle; label: string; sub: string; confirm: string }[] = [
   {
     key: "solo",
-    icon: "🎧",
     label: "Flying solo",
     sub: "I do my best stuff alone or I'm usually on my own",
     confirm: "Some of the best moves are better alone anyway.",
   },
   {
     key: "small_group",
-    icon: "👋",
     label: "Small circle",
     sub: "One or two people I actually like",
     confirm: "We'll find moves worth sharing.",
   },
   {
     key: "big_group",
-    icon: "🎉",
     label: "Big energy",
     sub: "The more people the better",
     confirm: "We'll find moves worth texting the whole group about.",
   },
   {
     key: "depends",
-    icon: "🌊",
     label: "Depends on the vibe",
     sub: "",
     confirm: "We'll read the room.",
@@ -1677,7 +1668,6 @@ function SocialBattery({
               style={[sb.card, active && sb.cardActive]}
               activeOpacity={0.75}
             >
-              <Text style={sb.icon}>{opt.icon}</Text>
               <View style={sb.cardText}>
                 <Text style={[sb.label, active && sb.labelActive]}>{opt.label}</Text>
                 {opt.sub ? (
@@ -1787,7 +1777,7 @@ function NotificationsScreen({
       {/* Notification mockup card */}
       <View style={no.mockCard}>
         <View style={no.mockIcon}>
-          <Text style={no.mockIconText}>📍</Text>
+          <Text style={no.mockIconText}>!</Text>
         </View>
         <View style={no.mockBody}>
           <Text style={no.mockApp}>What's the Move</Text>
@@ -1807,7 +1797,7 @@ function NotificationsScreen({
 
       <View style={no.buttons}>
         <Pressable style={no.notifyBtn} onPress={requestNotifications} activeOpacity={0.8}>
-          <Text style={no.notifyBtnText}>🔔  Notify me about rare moves</Text>
+          <Text style={no.notifyBtnText}>Notify me about rare moves</Text>
         </Pressable>
         <Pressable onPress={skip} style={no.skipBtn} hitSlop={12} activeOpacity={0.7}>
           <Text style={no.skipBtnText}>Not right now</Text>
