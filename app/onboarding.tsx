@@ -2098,7 +2098,7 @@ function Payoff({
             {`${userInterests.length} interest${userInterests.length !== 1 ? "s" : ""}. Your city. Right now.`}
           </Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Bottom action */}
       <View style={[py.bottom, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
