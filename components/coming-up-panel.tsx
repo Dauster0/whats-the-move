@@ -103,6 +103,7 @@ function mapApiSuggestion(x: Record<string, unknown>): ConciergeSuggestion {
     placeOpenNow:
       x.placeOpenNow === true ? true : x.placeOpenNow === false ? false : null,
     closesSoon: Boolean(x.closesSoon),
+    openUntil: x.openUntil != null ? String(x.openUntil) : undefined,
     deckRole: x.deckRole != null ? String(x.deckRole) : undefined,
     sourceType: x.sourceType != null ? String(x.sourceType) : undefined,
     cost: x.cost != null ? String(x.cost) : undefined,

@@ -743,9 +743,15 @@ function attachPlaceMeta(suggestions, nearbyPlaces, nowIso) {
       return { ...s, placeOpenNow: null, closesSoon: false };
     }
     let closesSoon = false;
+    let openUntil = null;
     if (place.nextCloseTime) {
       const t = new Date(place.nextCloseTime).getTime();
-      if (!Number.isNaN(t) && t > now && (t - now) / 60000 <= 45) closesSoon = true;
+      if (!Number.isNaN(t) && t > now) {
+        if ((t - now) / 60000 <= 45) closesSoon = true;
+        const d = new Date(place.nextCloseTime);
+        const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+        openUntil = `Open until ${timeStr}`;
+      }
     }
     let distanceText = String(s.distanceText || "").trim();
     if (!distanceText && typeof place.distanceMiles === "number") {
@@ -756,6 +762,7 @@ function attachPlaceMeta(suggestions, nearbyPlaces, nowIso) {
       ...s,
       placeOpenNow: place.openNow != null ? place.openNow : null,
       closesSoon,
+      ...(openUntil ? { openUntil } : {}),
       ...(distanceText ? { distanceText } : {}),
     };
   });
@@ -995,7 +1002,13 @@ function normalizeSuggestions(raw) {
   for (const s of arr) {
     if (!s || typeof s !== "object") continue;
     const title = String(s.title || "").trim();
-    const description = String(s.description || "").trim();
+    // Strip GPT-hallucinated closing times — real hours come from Google Places via openUntil
+    const description = String(s.description || "")
+      .replace(/,?\s*open until \d{1,2}(?::\d{2})?\s*(?:am|pm)/gi, "")
+      .replace(/,?\s*open(?:s)? until \d{1,2}(?::\d{2})?\s*(?:am|pm)/gi, "")
+      .replace(/,?\s*closes? at \d{1,2}(?::\d{2})?\s*(?:am|pm)/gi, "")
+      .replace(/,?\s*open(?:s)? (?:daily|today) until \d{1,2}(?::\d{2})?\s*(?:am|pm)/gi, "")
+      .trim();
     if (!title || !description) continue;
     const eventId = String(s.eventId || s.ticketEventId || "").trim();
     const placeId = String(s.placeId || "").trim();

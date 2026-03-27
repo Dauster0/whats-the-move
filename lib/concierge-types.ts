@@ -38,6 +38,8 @@ export type ConciergeSuggestion = {
   placeOpenNow?: boolean | null;
   /** Closing within ~45 minutes — server */
   closesSoon?: boolean;
+  /** "Open until 9:00 PM" — derived from Google Places nextCloseTime, never GPT */
+  openUntil?: string;
   photoUrl: string | null;
   imageLayout?: ConciergeImageLayout;
   photoSource?: string | null;

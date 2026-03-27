@@ -224,9 +224,11 @@ export function ConciergeHeroCard({
         {displayDescription}
       </Text>
 
-      {s.distanceText || s.cost ? (
+      {(s.distanceText || s.cost || s.openUntil) ? (
         <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={2}>
-          {[s.distanceText, s.cost].filter((v) => v && !/^varies$/i.test(String(v).trim())).join(" · ")}
+          {[s.distanceText, s.cost, s.openUntil]
+            .filter((v) => v && !/^varies$/i.test(String(v).trim()))
+            .join(" · ")}
         </Text>
       ) : null}
 

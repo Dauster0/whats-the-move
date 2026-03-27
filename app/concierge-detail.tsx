@@ -4,7 +4,9 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   KeyboardAvoidingView,
@@ -82,12 +84,66 @@ type DetailApi = {
   error?: string;
 };
 
-function openMapsQuery(q: string) {
+async function openMapsQuery(q: string) {
   const query = String(q || "").trim();
   if (!query) return;
-  Linking.openURL(
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-  ).catch(() => {});
+
+  const encoded = encodeURIComponent(query);
+
+  const candidates: { label: string; url: string }[] = [
+    { label: "Apple Maps", url: `maps://?q=${encoded}` },
+    { label: "Google Maps", url: `comgooglemaps://?q=${encoded}` },
+    { label: "Waze", url: `waze://?q=${encoded}&navigate=yes` },
+  ];
+
+  const available = (
+    await Promise.all(
+      candidates.map(async (c) => ({
+        ...c,
+        ok: await Linking.canOpenURL(c.url).catch(() => false),
+      }))
+    )
+  ).filter((c) => c.ok);
+
+  // If only one option, open it directly
+  if (available.length === 1) {
+    Linking.openURL(available[0].url).catch(() => {});
+    return;
+  }
+
+  // If none available (simulator / old iOS), fall back to web Google Maps
+  if (available.length === 0) {
+    Linking.openURL(
+      `https://www.google.com/maps/search/?api=1&query=${encoded}`
+    ).catch(() => {});
+    return;
+  }
+
+  const options = [...available.map((c) => c.label), "Cancel"];
+
+  if (Platform.OS === "ios") {
+    ActionSheetIOS.showActionSheetWithOptions(
+      { options, cancelButtonIndex: options.length - 1, title: "Open in…" },
+      (idx) => {
+        if (idx < available.length) {
+          Linking.openURL(available[idx].url).catch(() => {});
+        }
+      }
+    );
+  } else {
+    // Android: use Alert as a simple picker
+    Alert.alert(
+      "Open in…",
+      undefined,
+      [
+        ...available.map((c) => ({
+          text: c.label,
+          onPress: () => Linking.openURL(c.url).catch(() => {}),
+        })),
+        { text: "Cancel", style: "cancel" as const },
+      ]
+    );
+  }
 }
 
 function pickSimilar(others: ConciergeSuggestion[], current: ConciergeSuggestion, n = 3) {
@@ -472,8 +528,10 @@ export default function ConciergeDetailScreen() {
                 detail?.cost?.free ? { color: "#4ade80" } : null,
               ]}
             >
-              {detail?.cost?.label ||
-                (detail?.cost?.free ? "Free" : suggestion?.ticketUrl ? "Check prices" : "Varies")}
+              {loadingQuick
+                ? "Looking up..."
+                : detail?.cost?.label ||
+                  (detail?.cost?.free ? "Free" : suggestion?.ticketUrl ? "Check prices" : "Varies")}
             </Text>
             {detail?.cost?.ticketUrl && !detail.cost.free ? (
               <Pressable
