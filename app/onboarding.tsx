@@ -30,7 +30,7 @@ const CARD = "#1C1C1E";
 const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
-const TOTAL_STEPS = 17;
+const TOTAL_STEPS = 16;
 const DEMO_DECK_H = Math.round(H * 0.52);
 
 const DEMO_DECK: ConciergeSuggestion[] = [
@@ -1043,11 +1043,13 @@ function LocationScreen({
   onContinue,
   onBack,
   onGranted,
+  onNeighborhood,
 }: {
   shellStep: number;
   onContinue: () => void;
   onBack: () => void;
   onGranted: (coords: { lat: number; lon: number }) => void;
+  onNeighborhood: (name: string) => void;
 }) {
   const [granted, setGranted] = useState(false);
   const [requesting, setRequesting] = useState(false);
@@ -1078,6 +1080,17 @@ function LocationScreen({
           accuracy: Location.Accuracy.Balanced,
         });
         onGranted({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        try {
+          const [geo] = await Location.reverseGeocodeAsync({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          const neighborhood =
+            geo?.district || geo?.subregion || geo?.city || geo?.name || "";
+          if (neighborhood) onNeighborhood(neighborhood);
+        } catch {
+          // reverse geocode failed — neighborhood stays as fallback
+        }
         setGranted(true);
       }
     } catch (e) {
@@ -1298,98 +1311,7 @@ function GenderScreen({
   );
 }
 
-// ─── Screen 10 — Neighborhood ─────────────────────────────────────────────────
-
-const AREAS = [
-  "Near campus / university",
-  "Central LA",
-  "West side (Venice, Santa Monica)",
-  "East side (Silver Lake, Echo Park)",
-  "South Bay / other",
-] as const;
-type Area = (typeof AREAS)[number];
-
-const AREA_DISPLAY: Record<Area, string> = {
-  "Near campus / university": "Your campus",
-  "Central LA": "Central LA",
-  "West side (Venice, Santa Monica)": "The West Side",
-  "East side (Silver Lake, Echo Park)": "The East Side",
-  "South Bay / other": "The South Bay",
-};
-
-function NeighborhoodScreen({
-  shellStep,
-  area,
-  onArea,
-  onContinue,
-  onBack,
-}: {
-  shellStep: number;
-  area: Area | null;
-  onArea: (v: Area) => void;
-  onContinue: () => void;
-  onBack: () => void;
-}) {
-  return (
-    <Shell
-      step={shellStep}
-      canContinue={area !== null}
-      continueLabel="That's my spot →"
-      onContinue={onContinue}
-      onBack={onBack}
-    >
-      <Text style={sc.headline}>{"What part of LA\ndo you call home?"}</Text>
-      <Text style={sc.subhead}>We'll prioritize moves close to you.</Text>
-
-      <View style={nb.pills}>
-        {AREAS.map((a) => {
-          const selected = area === a;
-          return (
-            <TouchableOpacity
-              key={a}
-              style={[nb.pill, selected && nb.pillSelected]}
-              activeOpacity={0.75}
-              onPress={() => onArea(a)}
-            >
-              <Text style={[nb.pillText, selected && nb.pillTextSelected]}>{a}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </Shell>
-  );
-}
-
-const nb = StyleSheet.create({
-  pills: {
-    marginTop: 32,
-    gap: 12,
-  },
-  pill: {
-    width: "100%",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    backgroundColor: CARD,
-    borderWidth: 1.5,
-    borderColor: "#2A2A2A",
-    alignItems: "center",
-  },
-  pillSelected: {
-    borderColor: PEACH,
-    backgroundColor: "#2C1810",
-  },
-  pillText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: MUTED_LIGHT,
-  },
-  pillTextSelected: {
-    color: PEACH,
-  },
-});
-
-// ─── Screen 11 — Mid Sell ────────────────────────────────────────────────────
+// ─── Screen 10 — Mid Sell ────────────────────────────────────────────────────
 
 function midSellHeadline(age: number, neighborhood: string): string {
   if (age <= 22) return `You're in the best city\nin the world to be ${age}.\nAct like it.`;
@@ -2297,7 +2219,7 @@ export default function OnboardingScreen() {
   const [freeNightStyle, setFreeNightStyle] = useState<FreeNightStyle>(null);
   const [userAge, setUserAge] = useState(22);
   const [userGender, setUserGender] = useState<Gender>(null);
-  const [userArea, setUserArea] = useState<Area | null>(null);
+  const [userNeighborhood, setUserNeighborhood] = useState<string>("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [userInterests, setUserInterests] = useState<string[]>([]);
   const [userBudget, setUserBudget] = useState<BudgetOption | null>(null);
@@ -2359,7 +2281,7 @@ export default function OnboardingScreen() {
       AsyncStorage.setItem("freeNightStyle", freeNightStyle ?? ""),
       AsyncStorage.setItem("userAge", String(userAge)),
       AsyncStorage.setItem("userGender", userGender ?? ""),
-      AsyncStorage.setItem("userArea", userArea ?? ""),
+      AsyncStorage.setItem("userNeighborhood", userNeighborhood),
       AsyncStorage.setItem("userLocation", JSON.stringify(userLocation)),
       AsyncStorage.setItem("userInterests", JSON.stringify(userInterests)),
       AsyncStorage.setItem("userBudget", userBudget ?? ""),
@@ -2373,7 +2295,7 @@ export default function OnboardingScreen() {
       energyMode: "mixed",
       placeMode: "both",
       preferredTimes: ["morning", "midday", "afternoon", "evening", "night"],
-      homeCity: userArea ? (AREA_DISPLAY[userArea] ?? userArea) : "",
+      homeCity: userNeighborhood,
       schoolOrWork: "",
       ageRange,
       socialBattery: socialBatteryPref,
@@ -2382,7 +2304,7 @@ export default function OnboardingScreen() {
     });
 
     // Advance to payoff screen — the button there does the final navigate
-    setStep(17);
+    setStep(16);
   }
 
   const ss = shellStep(step, emailChosen);
@@ -2431,6 +2353,7 @@ export default function OnboardingScreen() {
       onContinue={goNext}
       onBack={goBack}
       onGranted={setUserLocation}
+      onNeighborhood={setUserNeighborhood}
     />
   );
 
@@ -2454,30 +2377,20 @@ export default function OnboardingScreen() {
     />
   );
 
+  const neighborhood = userNeighborhood || "your area";
+
   if (step === 9) return (
-    <NeighborhoodScreen
-      shellStep={ss}
-      area={userArea}
-      onArea={setUserArea}
-      onContinue={goNext}
-      onBack={goBack}
-    />
-  );
-
-  const areaDisplay = userArea ? (AREA_DISPLAY[userArea] ?? userArea) : "LA";
-
-  if (step === 10) return (
     <MidSell
       shellStep={ss}
       userAge={userAge}
-      userNeighborhood={areaDisplay}
+      userNeighborhood={neighborhood}
       userInterests={userInterests}
       onContinue={goNext}
       onBack={goBack}
     />
   );
 
-  if (step === 11) return (
+  if (step === 10) return (
     <InterestGrid
       shellStep={ss}
       chips={INTERESTS_1}
@@ -2492,7 +2405,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 12) return (
+  if (step === 11) return (
     <InterestGrid
       shellStep={ss}
       chips={INTERESTS_2}
@@ -2507,7 +2420,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 13) return (
+  if (step === 12) return (
     <BudgetScreen
       shellStep={ss}
       value={userBudget}
@@ -2517,7 +2430,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 14) return (
+  if (step === 13) return (
     <SocialBattery
       shellStep={ss}
       value={userSocialStyle}
@@ -2527,7 +2440,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 15) return (
+  if (step === 14) return (
     <NotificationsScreen
       shellStep={ss}
       onContinue={goNext}
@@ -2535,10 +2448,10 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 16) return (
+  if (step === 15) return (
     <SetupScreen
       shellStep={ss}
-      userNeighborhood={areaDisplay}
+      userNeighborhood={neighborhood}
       userInterests={userInterests}
       userBudget={userBudget}
       userSocialStyle={userSocialStyle}
@@ -2546,10 +2459,10 @@ export default function OnboardingScreen() {
     />
   );
 
-  // Step 17 — Payoff (navigated to after finish() saves data)
+  // Step 16 — Payoff (navigated to after finish() saves data)
   return (
     <Payoff
-      userNeighborhood={areaDisplay}
+      userNeighborhood={neighborhood}
       userInterests={userInterests}
       onFinish={() => router.replace("/")}
     />
