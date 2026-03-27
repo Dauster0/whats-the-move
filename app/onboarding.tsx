@@ -2119,6 +2119,7 @@ export default function OnboardingScreen() {
 
     await Promise.all([
       AsyncStorage.setItem("hasCompletedOnboarding", "true"),
+      AsyncStorage.setItem("has_finished_onboarding", "true"),
       AsyncStorage.setItem("freeNightStyle", freeNightStyle ?? ""),
       AsyncStorage.setItem("userAge", String(userAge)),
       AsyncStorage.setItem("userGender", userGender ?? ""),
@@ -2128,6 +2129,7 @@ export default function OnboardingScreen() {
       AsyncStorage.setItem("userBudget", userBudget ?? ""),
       AsyncStorage.setItem("userSocialStyle", userSocialStyle ?? ""),
     ]);
+    console.log("Onboarding complete flag:", await AsyncStorage.getItem("hasCompletedOnboarding"));
 
     setPreferencesAndFinishOnboarding({
       interests: userInterests,

@@ -142,6 +142,7 @@ export function MoveProvider({ children }: { children: ReactNode }) {
         const savedOnboarding = await AsyncStorage.getItem(
           ONBOARDING_STORAGE_KEY
         );
+        console.log("Onboarding complete flag:", await AsyncStorage.getItem("hasCompletedOnboarding"));
 
         if (savedMoves) {
           setCompletedMoves(JSON.parse(savedMoves));
@@ -191,7 +192,8 @@ export function MoveProvider({ children }: { children: ReactNode }) {
           });
         }
 
-        if (savedOnboarding === "true") {
+        const legacyOnboarding = await AsyncStorage.getItem("hasCompletedOnboarding");
+        if (savedOnboarding === "true" || legacyOnboarding === "true") {
           setHasFinishedOnboarding(true);
         }
       } catch (error) {
