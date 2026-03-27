@@ -1,10 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { ConciergeHeroCard } from "../components/concierge-hero-card";
-import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
-import type { ConciergeSuggestion } from "../lib/concierge-types";
-import { getColors } from "../lib/theme";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -31,67 +27,6 @@ const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
 const TOTAL_STEPS = 17;
-const SPLASH_DECK_H = 310;
-
-const DEMO_DECK: ConciergeSuggestion[] = [
-  {
-    title: "Clairo at The Wiltern",
-    description: "Indie pop — small venue, intimate show",
-    category: "event",
-    timeRequired: "2 hrs",
-    energyLevel: "medium",
-    address: "",
-    startTime: "",
-    venueName: "",
-    mapQuery: "",
-    unsplashQuery: "",
-    whyNow: "",
-    ticketUrl: "",
-    ticketEventId: "",
-    sourcePlaceName: "",
-    photoUrl: "https://picsum.photos/seed/wtm-concert/700/420",
-    deckRole: "event",
-    kind: "event",
-  },
-  {
-    title: "Birrieria Chalio",
-    description: "Best birria in Koreatown, open until 3am",
-    category: "eat",
-    timeRequired: "45 min",
-    energyLevel: "low",
-    address: "",
-    startTime: "",
-    venueName: "",
-    mapQuery: "",
-    unsplashQuery: "",
-    whyNow: "",
-    ticketUrl: "",
-    ticketEventId: "",
-    sourcePlaceName: "",
-    photoUrl: "https://picsum.photos/seed/wtm-tacos/700/420",
-    deckRole: "food",
-    kind: "place",
-  },
-  {
-    title: "Meteor Shower at Griffith",
-    description: "Peaks at 11pm, free, rare",
-    category: "experience",
-    timeRequired: "2 hrs",
-    energyLevel: "low",
-    address: "",
-    startTime: "",
-    venueName: "",
-    mapQuery: "",
-    unsplashQuery: "",
-    whyNow: "",
-    ticketUrl: "",
-    ticketEventId: "",
-    sourcePlaceName: "",
-    photoUrl: "https://picsum.photos/seed/wtm-stars/700/420",
-    deckRole: "experience",
-    kind: "experience",
-  },
-];
 
 // ─── Shared Shell ────────────────────────────────────────────────────────────
 
@@ -263,28 +198,12 @@ const sh = StyleSheet.create({
 
 function Splash({ onContinue }: { onContinue: () => void }) {
   const insets = useSafeAreaInsets();
-  const [demoDeck, setDemoDeck] = useState<ConciergeSuggestion[]>(DEMO_DECK);
-  const colors = getColors(true);
-  const deckColors = {
-    accent: colors.accent,
-    text: colors.text,
-    textMuted: colors.textMuted,
-    textInverse: colors.textInverse,
-  };
-
-  function cycleCard() {
-    setDemoDeck((prev) => {
-      const [first, ...rest] = prev;
-      return [...rest, first];
-    });
-  }
 
   return (
     <View style={sp.root}>
       <StatusBar barStyle="light-content" />
 
       <View style={[sp.upper, { paddingTop: insets.top + 24 }]}>
-        {/* 1 — Headline */}
         <View style={sp.textPad}>
           <Text style={sp.eyebrow}>SOMETHING GOOD IS HAPPENING TONIGHT</Text>
           <Text style={sp.headline}>
@@ -293,34 +212,9 @@ function Splash({ onContinue }: { onContinue: () => void }) {
           <Text style={sp.body}>
             {"What's the Move finds the best things happening in your city right now — and makes it effortless to just go."}
           </Text>
-          <Text style={sp.previewLabel}>TONIGHT NEAR YOU</Text>
         </View>
-
-        {/* 2 — Real swipe deck */}
-        <ConciergeSwipeDeck
-          suggestions={demoDeck}
-          width={W}
-          height={SPLASH_DECK_H}
-          colors={deckColors}
-          onSwipeRight={cycleCard}
-          onSwipeLeft={cycleCard}
-          renderCard={(s) => (
-            <ConciergeHeroCard
-              suggestion={s}
-              width={W}
-              deckMaxHeight={SPLASH_DECK_H}
-              imageGradientBottomColor={colors.bgCard}
-              colors={colors}
-              swipeMode
-              onOpenMaps={() => {}}
-              onOpenTickets={() => {}}
-            />
-          )}
-        />
-        <Text style={sp.swipeHint}>Swipe to preview →</Text>
       </View>
 
-      {/* 3 — Button pinned to bottom */}
       <View style={[sp.bottom, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
         <Pressable onPress={onContinue} style={sp.btn} activeOpacity={0.85}>
           <Text style={sp.btnText}>Show me what's out there →</Text>
