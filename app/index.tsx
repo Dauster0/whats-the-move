@@ -562,6 +562,11 @@ export default function HomeScreen() {
     return null;
   }
 
+  const energyLabel = energy === "low" ? "🌙 Low" : energy === "high" ? "🚀 High" : "⚡ Mid";
+  const timeLabel = timeBudget === "30min" ? "~30 min" : timeBudget === "allday" ? "No rush" : "1–3 hrs";
+  const hungerPref = preferences.hungerPreference ?? "any";
+  const hungerLabel = hungerPref === "hungry" ? "Hungry" : hungerPref === "not_hungry" ? "Not hungry" : "Either";
+
   return (
     <View style={styles.rootWrap}>
     <ScrollView
@@ -578,28 +583,16 @@ export default function HomeScreen() {
       }
     >
       <View style={styles.topBar}>
-        <Text style={styles.areaPill} numberOfLines={1}>
-          {areaLabel || "Near you"}
-        </Text>
-        {homeTab === "forYou" ? (
-          <Pressable
-            style={[styles.filterBtn, filtersVisible && styles.filterBtnActive]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setFiltersVisible((v) => !v);
-            }}
-            hitSlop={8}
-          >
-            <Ionicons
-              name="options-outline"
-              size={17}
-              color={filtersVisible ? colors.textInverse : colors.text}
-            />
-            <Text style={[styles.filterBtnText, filtersVisible && styles.filterBtnTextActive]}>
-              Filters
-            </Text>
-          </Pressable>
-        ) : null}
+        {/* Branding */}
+        <View style={styles.branding}>
+          <View style={styles.brandIcon}>
+            <Ionicons name="sparkles" size={13} color="#1A1A1A" />
+          </View>
+          <View>
+            <Text style={styles.brandName}>What's the Move</Text>
+            <Text style={styles.brandLocation} numberOfLines={1}>{areaLabel || "Near you"}</Text>
+          </View>
+        </View>
         <Pressable
           style={styles.menuBtn}
           onPress={() => {
@@ -702,6 +695,14 @@ export default function HomeScreen() {
         />
       ) : homeTab === "forYou" ? (
       <>
+      {/* Slim filter summary bar */}
+      <Pressable
+        style={styles.filterBar}
+        onPress={() => { Haptics.selectionAsync(); setFiltersVisible((v) => !v); }}
+      >
+        <Text style={styles.filterBarText}>{energyLabel} · {timeLabel} · {hungerLabel}</Text>
+        <Ionicons name={filtersVisible ? "chevron-up" : "chevron-down"} size={12} color={colors.textMuted} />
+      </Pressable>
       {filtersVisible ? <View style={styles.controlBlock}>
         <View style={styles.controlFilterRow}>
         <Text style={styles.controlLabel}>Energy</Text>
@@ -1093,6 +1094,50 @@ function createStyles(
       fontWeight: "700",
       color: colors.textSub,
       letterSpacing: -0.1,
+    },
+    branding: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    brandIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: "#E8A87C",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    brandName: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: colors.text,
+      letterSpacing: -0.3,
+    },
+    brandLocation: {
+      fontSize: 11,
+      color: colors.textMuted,
+      fontWeight: "500",
+      marginTop: 1,
+    },
+    filterBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgCard,
+    },
+    filterBarText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textMuted,
     },
     menuBtn: {
       width: 40,
