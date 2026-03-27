@@ -6,6 +6,7 @@ import { ConciergeHeroCard } from "../components/concierge-hero-card";
 import { ConciergeSwipeDeck } from "../components/concierge-swipe-deck";
 import type { ConciergeSuggestion } from "../lib/concierge-types";
 import { getColors } from "../lib/theme";
+import { USER_INTEREST_SECTIONS, type InterestSection } from "../lib/user-interests";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -31,7 +32,7 @@ const CARD = "#1C1C1E";
 const WHITE = "#FFFFFF";
 const MUTED = "#6B6B6B";
 const MUTED_LIGHT = "#9A9A9A";
-const TOTAL_STEPS = 16;
+const TOTAL_STEPS = 19;
 const DEMO_DECK_H = Math.round(H * 0.52);
 
 const DEMO_DECK: ConciergeSuggestion[] = [
@@ -97,11 +98,12 @@ const DEMO_DECK: ConciergeSuggestion[] = [
 // ─── Shared Shell ────────────────────────────────────────────────────────────
 
 type ShellProps = {
-  step: number; // 1-17, or 0 for no bar
+  step: number;
   canContinue: boolean;
   continueLabel?: string;
   onContinue: () => void;
   onBack?: () => void;
+  onSkip?: () => void;
   children: React.ReactNode;
   scrollable?: boolean;
 };
@@ -112,6 +114,7 @@ function Shell({
   continueLabel = "Continue",
   onContinue,
   onBack,
+  onSkip,
   children,
   scrollable = false,
 }: ShellProps) {
@@ -154,6 +157,11 @@ function Shell({
         {onBack && (
           <Pressable onPress={onBack} style={sh.backLink} hitSlop={12}>
             <Text style={sh.backText}>← Back</Text>
+          </Pressable>
+        )}
+        {onSkip && (
+          <Pressable onPress={onSkip} style={sh.skipLink} hitSlop={12}>
+            <Text style={sh.skipText}>Skip this</Text>
           </Pressable>
         )}
         <Pressable
@@ -236,6 +244,15 @@ const sh = StyleSheet.create({
   },
   backText: {
     fontSize: 14,
+    color: MUTED,
+    fontWeight: "500",
+  },
+  skipLink: {
+    alignSelf: "center",
+    marginBottom: 10,
+  },
+  skipText: {
+    fontSize: 13,
     color: MUTED,
     fontWeight: "500",
   },
@@ -1378,147 +1395,120 @@ const ms = StyleSheet.create({
   },
 });
 
-// ─── Screen 12 — Interests Part 1 ────────────────────────────────────────────
+// ─── Screens 11–15 — Interests (5 screens) ────────────────────────────────────
 
-const INTERESTS_1 = [
-  { key: "live_music", label: "Live music" },
-  { key: "food",       label: "Food" },
-  { key: "beach",      label: "Beach" },
-  { key: "comedy",     label: "Comedy" },
-  { key: "coffee",     label: "Coffee" },
-  { key: "hiking",     label: "Hiking" },
-  { key: "bowling",    label: "Bowling" },
-  { key: "arcade",     label: "Arcade" },
-  { key: "nightlife",  label: "Nightlife" },
-  { key: "sports",     label: "Sports" },
-  { key: "books",      label: "Books" },
-  { key: "art",        label: "Art" },
-  { key: "dancing",    label: "Dancing" },
-  { key: "late_night", label: "Late night" },
-  { key: "movies",     label: "Movies" },
-  { key: "pickleball", label: "Pickleball" },
-  { key: "karaoke",    label: "Karaoke" },
-  { key: "stargazing", label: "Stargazing" },
+// Section groups by screen (indexes into USER_INTEREST_SECTIONS)
+// Sections order: Basics[0], Sports[1], Food[2], Arts[3], Social[4],
+//                 Outdoors[5], Chill[6], Learning[7]
+const INTEREST_SCREENS: { headline: string; sectionIndexes: number[] }[] = [
+  { headline: "What gets you off the couch?", sectionIndexes: [0] },
+  { headline: "What do you play?",            sectionIndexes: [1] },
+  { headline: "How do you eat and drink?",    sectionIndexes: [2] },
+  { headline: "What's your scene?",           sectionIndexes: [3, 4] },
+  { headline: "Where do you go?",             sectionIndexes: [5, 6, 7] },
 ];
 
-const INTERESTS_2 = [
-  { key: "festivals",  label: "Festivals" },
-  { key: "wine_bars",  label: "Wine bars" },
-  { key: "surfing",    label: "Surfing" },
-  { key: "trivia",     label: "Trivia" },
-  { key: "yoga",       label: "Yoga" },
-  { key: "boxing",     label: "Boxing" },
-  { key: "improv",     label: "Improv" },
-  { key: "markets",    label: "Markets" },
-  { key: "popups",     label: "Pop-ups" },
-  { key: "cycling",    label: "Cycling" },
-  { key: "climbing",   label: "Climbing" },
-  { key: "golf",       label: "Golf" },
-  { key: "theater",    label: "Theater" },
-  { key: "breweries",  label: "Breweries" },
-  { key: "exploring",  label: "Exploring" },
-  { key: "volleyball", label: "Volleyball" },
-  { key: "dessert",    label: "Dessert" },
-  { key: "events",     label: "Events" },
-];
-
-function InterestGrid({
+function InterestStep({
   shellStep,
-  chips,
+  sections,
+  headline,
   selected,
   onToggle,
-  headline,
-  subhead,
-  continueLabel,
-  minToUnlock,
+  isLast,
   onContinue,
+  onSkip,
   onBack,
 }: {
   shellStep: number;
-  chips: { key: string; label: string }[];
+  sections: InterestSection[];
+  headline: string;
   selected: string[];
   onToggle: (key: string) => void;
-  headline: string;
-  subhead: string;
-  continueLabel: string;
-  minToUnlock: number;
+  isLast: boolean;
   onContinue: () => void;
+  onSkip: () => void;
   onBack: () => void;
 }) {
-  const count = selected.length;
-
   return (
     <Shell
       step={shellStep}
-      canContinue={count >= minToUnlock}
-      continueLabel={continueLabel}
+      canContinue={true}
+      continueLabel={isLast ? "That's me" : "Next"}
       onContinue={onContinue}
       onBack={onBack}
+      onSkip={onSkip}
       scrollable
     >
       <Text style={sc.headline}>{headline}</Text>
-      <Text style={sc.subhead}>{subhead}</Text>
 
-      <View style={ig.grid}>
-        {chips.map(({ key, label }) => {
-          const active = selected.includes(key);
-          return (
-            <Pressable
-              key={key}
-              onPress={() => onToggle(key)}
-              style={[ig.chip, active && ig.chipActive]}
-              activeOpacity={0.75}
-            >
-              <Text style={[ig.chipText, active && ig.chipTextActive]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={ig.counter}>
-        {count === 0 ? "Pick at least 3 to continue" : `${count} selected`}
-      </Text>
+      {sections.map((section) => (
+        <View key={section.title} style={ig.sectionBlock}>
+          {sections.length > 1 && (
+            <Text style={ig.sectionHeading}>{section.title}</Text>
+          )}
+          <View style={ig.grid}>
+            {section.items.map(({ key, label }) => {
+              const active = selected.includes(key);
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => onToggle(key)}
+                  style={[ig.chip, active && ig.chipActive]}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[ig.chipText, active && ig.chipTextActive]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
     </Shell>
   );
 }
 
 const ig = StyleSheet.create({
+  sectionBlock: {
+    marginTop: 20,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: MUTED,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 20,
   },
   chip: {
     backgroundColor: CARD,
     borderRadius: 999,
     paddingVertical: 11,
     paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: "#2A2A2A",
   },
   chipActive: {
     backgroundColor: PEACH,
+    borderColor: PEACH,
   },
   chipText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "700",
     color: WHITE,
   },
   chipTextActive: {
     color: "#1A1A1A",
   },
-  counter: {
-    fontSize: 13,
-    color: MUTED,
-    textAlign: "center",
-    marginTop: 20,
-    marginBottom: 8,
-    fontWeight: "500",
-  },
 });
 
-// ─── Screen 14 — Budget ───────────────────────────────────────────────────────
+// ─── Screen 16 — Budget ───────────────────────────────────────────────────────
 
 type BudgetOption = "free" | "cheap" | "splurge" | "varies";
 
@@ -2273,7 +2263,7 @@ export default function OnboardingScreen() {
     });
 
     // Advance to payoff screen — the button there does the final navigate
-    setStep(16);
+    setStep(19);
   }
 
   const ss = shellStep(step, emailChosen);
@@ -2359,37 +2349,27 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 10) return (
-    <InterestGrid
-      shellStep={ss}
-      chips={INTERESTS_1}
-      selected={userInterests}
-      onToggle={toggleInterest}
-      headline={"What gets you\noff the couch?"}
-      subhead="Pick everything that applies. The more you choose, the better your moves."
-      continueLabel="Good start →"
-      minToUnlock={3}
-      onContinue={goNext}
-      onBack={goBack}
-    />
-  );
+  // Steps 10–14 — Interests (5 screens A–E)
+  if (step >= 10 && step <= 14) {
+    const screenIdx = step - 10;
+    const screen = INTEREST_SCREENS[screenIdx];
+    const sections = screen.sectionIndexes.map((i) => USER_INTEREST_SECTIONS[i]);
+    return (
+      <InterestStep
+        shellStep={ss}
+        sections={sections}
+        headline={screen.headline}
+        selected={userInterests}
+        onToggle={toggleInterest}
+        isLast={step === 14}
+        onContinue={goNext}
+        onSkip={goNext}
+        onBack={goBack}
+      />
+    );
+  }
 
-  if (step === 11) return (
-    <InterestGrid
-      shellStep={ss}
-      chips={INTERESTS_2}
-      selected={userInterests}
-      onToggle={toggleInterest}
-      headline={"A few more —\nthese matter too."}
-      subhead="These help us find the hidden stuff."
-      continueLabel="That's me →"
-      minToUnlock={0}
-      onContinue={goNext}
-      onBack={goBack}
-    />
-  );
-
-  if (step === 12) return (
+  if (step === 15) return (
     <BudgetScreen
       shellStep={ss}
       value={userBudget}
@@ -2399,7 +2379,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 13) return (
+  if (step === 16) return (
     <SocialBattery
       shellStep={ss}
       value={userSocialStyle}
@@ -2409,7 +2389,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 14) return (
+  if (step === 17) return (
     <NotificationsScreen
       shellStep={ss}
       onContinue={goNext}
@@ -2417,7 +2397,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  if (step === 15) return (
+  if (step === 18) return (
     <SetupScreen
       shellStep={ss}
       userNeighborhood={neighborhood}
@@ -2428,7 +2408,7 @@ export default function OnboardingScreen() {
     />
   );
 
-  // Step 16 — Payoff (navigated to after finish() saves data)
+  // Step 19 — Payoff (navigated to after finish() saves data)
   return (
     <Payoff
       userNeighborhood={neighborhood}
