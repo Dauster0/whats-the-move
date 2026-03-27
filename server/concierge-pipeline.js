@@ -1228,7 +1228,9 @@ export async function runConciergeRecommendations(body) {
   }
 
   suggestions = attachPlaceResourceNames(suggestions, nearbyPlaces);
+  const beforeExclude = suggestions.slice();
   suggestions = filterExcludedKeys(suggestions, excludeSuggestionKeys);
+  if (suggestions.length === 0) suggestions = beforeExclude; // exclude list wiped everything — show fresh anyway
   suggestions = filterSafetyMacArthur(suggestions, wall.hour24);
   const beforeClose = suggestions.slice();
   suggestions = filterClosedVenuePlaces(suggestions, nearbyPlaces);
@@ -1509,7 +1511,9 @@ export async function runConciergeAheadRecommendations(body) {
   }
 
   suggestions = attachPlaceResourceNames(suggestions, nearbyPlaces);
+  const beforeExclude = suggestions.slice();
   suggestions = filterExcludedKeys(suggestions, excludeSuggestionKeys);
+  if (suggestions.length === 0) suggestions = beforeExclude; // exclude list wiped everything — show fresh anyway
   suggestions = filterSafetyMacArthur(suggestions, wall.hour24);
   const beforeClose = suggestions.slice();
   suggestions = filterClosedVenuePlaces(suggestions, nearbyPlaces, true);

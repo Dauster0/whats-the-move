@@ -812,7 +812,7 @@ function CreateAccount({
           onPress={() => handleSocial("apple")}
           activeOpacity={0.75}
         >
-          <Text style={ca.authIcon}>A</Text>
+          <Ionicons name="logo-apple" size={20} color={WHITE} style={ca.authIconView} />
           <Text style={ca.authText}>Continue with Apple</Text>
         </Pressable>
 
@@ -821,12 +821,12 @@ function CreateAccount({
           onPress={() => handleSocial("google")}
           activeOpacity={0.75}
         >
-          <Text style={ca.authIcon}>G</Text>
+          <Ionicons name="logo-google" size={20} color={WHITE} style={ca.authIconView} />
           <Text style={ca.authText}>Continue with Google</Text>
         </Pressable>
 
         <Pressable style={ca.authBtn} onPress={onEmail} activeOpacity={0.75}>
-          <Text style={ca.authIcon}>@</Text>
+          <Ionicons name="mail" size={20} color={WHITE} style={ca.authIconView} />
           <Text style={ca.authText}>Continue with Email</Text>
         </Pressable>
       </View>
@@ -850,8 +850,7 @@ const ca = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 14,
   },
-  authIcon: {
-    fontSize: 18,
+  authIconView: {
     width: 24,
     textAlign: "center",
   },
@@ -888,6 +887,7 @@ function EmailConfirm({
       onBack={onBack}
     >
       <View style={ec.center}>
+        <Ionicons name="mail" size={52} color={PEACH} />
       </View>
       <Text style={[sc.headline, { textAlign: "center" }]}>
         Check your email.
@@ -2274,7 +2274,7 @@ export default function OnboardingScreen() {
   if (step === 17) return (
     <SetupScreen
       shellStep={ss}
-      userNeighborhood={neighborhood}
+      userNeighborhood={userNeighborhood}
       userInterests={userInterests}
       userBudget={userBudget}
       userSocialStyle={userSocialStyle}
@@ -2285,7 +2285,7 @@ export default function OnboardingScreen() {
   // Step 18 — Payoff (navigated to after finish() saves data)
   return (
     <Payoff
-      userNeighborhood={neighborhood}
+      userNeighborhood={userNeighborhood}
       userInterests={userInterests}
       onFinish={() => router.replace("/")}
     />
