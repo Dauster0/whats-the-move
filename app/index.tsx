@@ -160,6 +160,7 @@ export default function HomeScreen() {
     const raw = SCREEN_H - insets.top - insets.bottom - aboveDeck - belowDeck;
     return Math.max(420, Math.min(560, raw));
   }, [insets.top, insets.bottom]);
+  const [cardAreaHeight, setCardAreaHeight] = useState(DECK_HEIGHT);
   const { hasFinishedOnboarding, isLoaded, preferences, setPreferences } = useMoveStore();
 
   const userInterestDeckChips = useMemo(() => {
@@ -568,19 +569,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.rootWrap}>
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.outerScroll}
-      showsVerticalScrollIndicator={false}
-      nestedScrollEnabled
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => load("refresh")}
-          tintColor={colors.accent}
-        />
-      }
-    >
       <View style={styles.topBar}>
         {/* Branding */}
         <View style={styles.branding}>
@@ -693,326 +681,179 @@ export default function HomeScreen() {
           deckHeight={DECK_HEIGHT}
         />
       ) : homeTab === "forYou" ? (
-      <>
-      {/* Energy filter row */}
-      <View style={styles.energyPillRow}>
-        {(
-          [
-            { key: "low" as const, label: "Chill" },
-            { key: "medium" as const, label: "Energetic" },
-            { key: "high" as const, label: "Either" },
-          ] as const
-        ).map(({ key, label }) => {
-          const active = energy === key;
-          return (
-            <Pressable
-              key={key}
-              style={[styles.energyPill, active && styles.energyPillActive]}
-              onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
-            >
-              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {/* Time filter row */}
-      <View style={styles.energyPillRow}>
-        {(
-          [
-            { key: "30min" as const, label: "30 min" },
-            { key: "mid" as const, label: "1–3 hrs" },
-            { key: "allday" as const, label: "No rush" },
-          ] as const
-        ).map(({ key, label }) => {
-          const active = timeBudget === key;
-          return (
-            <Pressable
-              key={key}
-              style={[styles.energyPill, active && styles.energyPillActive]}
-              onPress={() => { Haptics.selectionAsync(); setTimeBudget(key); }}
-            >
-              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {/* Hunger filter row */}
-      <View style={styles.energyPillRow}>
-        {(
-          [
-            { key: "any" as const, label: "Either" },
-            { key: "hungry" as const, label: "Hungry" },
-            { key: "not_hungry" as const, label: "Not hungry" },
-          ] as const
-        ).map(({ key, label }) => {
-          const active = (preferences.hungerPreference ?? "any") === key;
-          return (
-            <Pressable
-              key={key}
-              style={[styles.energyPill, active && styles.energyPillActive]}
-              onPress={() => { Haptics.selectionAsync(); setPreferences({ ...preferences, hungerPreference: key }); }}
-            >
-              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable
-        style={styles.findMovesBtn}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); load("full"); }}
-      >
-        <Text style={styles.findMovesBtnText}>Find moves</Text>
-      </Pressable>
+      <View style={styles.forYouWrap}>
+        {locationDenied ? (
+          <Pressable style={styles.locationBanner} onPress={() => Linking.openSettings()}>
+            <Text style={styles.locationBannerText}>
+              Enable location for better picks — tap to open Settings
+            </Text>
+          </Pressable>
+        ) : null}
 
-      {false ? <View style={styles.controlBlock}>
-        <View style={styles.controlFilterRow}>
-        <Text style={styles.controlLabel}>Energy</Text>
-        <View style={styles.segmentRow}>
-            {(
+        {/* Card area — fills remaining space */}
+        <View
+          style={styles.cardArea}
+          onLayout={(e) => setCardAreaHeight(e.nativeEvent.layout.height)}
+        >
+          {loading && suggestions.length === 0 ? (
+            <View style={styles.loadingBlock}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.loadingBlurb}>Reading the room…</Text>
+              <Text style={styles.loadingSub}>Pulling what’s open, what’s on, and what fits you.</Text>
+            </View>
+          ) : error && suggestions.length === 0 ? (
+            <View style={styles.loadingBlock}>
+              <ActivityIndicator size="small" color="#F5F0E8" />
+              <Text style={styles.loadingBlurb}>Finding your moves...</Text>
+              <Pressable
+                hitSlop={12}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  load("full");
+                }}
+              >
+                <Text style={styles.retryLink}>Taking too long? Tap to retry</Text>
+              </Pressable>
+            </View>
+          ) : suggestions.length === 0 ? (
+            <View style={styles.loadingBlock}>
+              {findingMoreDeck ? (
+                <Text style={[styles.loadingSub, { textAlign: "center" }]}>Getting more…</Text>
+              ) : (
+                <>
+                  <Text style={styles.errorText}>You’re caught up.</Text>
+                  <Text style={styles.loadingSub}>Pull to refresh for a new deck.</Text>
+                </>
+              )}
+            </View>
+          ) : cardAreaHeight > 0 ? (
+            <View style={[styles.deckWrap, { height: cardAreaHeight }]}>
+              <ConciergeSwipeDeck
+                suggestions={suggestions}
+                width={DECK_W}
+                height={cardAreaHeight}
+                colors={{
+                  accent: colors.accent,
+                  text: colors.text,
+                  textMuted: colors.textMuted,
+                  textInverse: colors.textInverse,
+                }}
+                onSwipeRight={quickCommitSwipeRight}
+                onSwipeLeft={commitSwipeLeft}
+                renderCard={(s, { isTop }) => (
+                  <ConciergeHeroCard
+                    suggestion={s}
+                    width={DECK_W}
+                    deckMaxHeight={cardAreaHeight}
+                    imageGradientBottomColor={colors.bgCard}
+                    colors={colors}
+                    swipeMode
+                    bookmarkSaved={isTop ? bookmarkSaved : false}
+                    onBookmarkPress={isTop ? () => void onBookmarkToggle() : undefined}
+                    onCardPress={isTop ? openPeekDetail : undefined}
+                    onOpenMaps={(sg) => {
+                      void pushRecentConciergeTitle(sg.title);
+                      openMapsQuery(sg.mapQuery || sg.title);
+                    }}
+                    onOpenTickets={(sg) => {
+                      void pushRecentConciergeTitle(sg.title);
+                      const u = String(sg.ticketUrl || "").trim();
+                      if (u) Linking.openURL(u).catch(() => {});
+                    }}
+                  />
+                )}
+              />
+              {showSwipeHint ? (
+                <View pointerEvents="none" style={styles.swipeHint}>
+                  <Text style={styles.swipeHintText}>← swipe to skip · swipe to go →</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Filter pills at bottom */}
+        <View style={styles.energyPillRow}>
+          {(
             [
-              { key: "low" as const, icon: "moon-outline" as const, label: "Low" },
-              { key: "medium" as const, icon: "flash-outline" as const, label: "Mid" },
-              { key: "high" as const, icon: "rocket-outline" as const, label: "High" },
+              { key: "low" as const, label: "Chill" },
+              { key: "medium" as const, label: "Energetic" },
+              { key: "high" as const, label: "Either" },
             ] as const
-          ).map(({ key, icon, label }) => {
+          ).map(({ key, label }) => {
             const active = energy === key;
             return (
               <Pressable
                 key={key}
-                style={[styles.segment, active && styles.segmentActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setEnergy(key);
-                }}
+                style={[styles.energyPill, active && styles.energyPillActive]}
+                onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
               >
-                <Ionicons
-                  name={icon}
-                  size={20}
-                  color={active ? colors.textInverse : colors.text}
-                />
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                  {label}
-                </Text>
+                <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
               </Pressable>
             );
           })}
         </View>
-        </View>
-
-        <View style={styles.controlFilterRow}>
-          <Text style={styles.controlLabel}>Time</Text>
-          <View style={styles.segmentRow}>
-            {(
-              [
-                { key: "30min" as const, label: "~30 min" },
-                { key: "mid" as const, label: "1–3 hrs" },
-                { key: "allday" as const, label: "No rush" },
-              ] as const
-            ).map(({ key, label }) => {
-              const active = timeBudget === key;
-              return (
-                <Pressable
-                  key={key}
-                  style={[styles.segment, active && styles.segmentActive]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setTimeBudget(key);
-                  }}
-                >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.controlFilterRow}>
-          <Text style={styles.controlLabel}>Hungry?</Text>
-          <View style={styles.segmentRow}>
-            {(
-              [
-                { key: "any" as const, label: "Either" },
-                { key: "hungry" as const, label: "Hungry" },
-                { key: "not_hungry" as const, label: "Not hungry" },
-              ] as const
-            ).map(({ key, label }) => {
-              const active = (preferences.hungerPreference ?? "any") === key;
-              return (
-                <Pressable
-                  key={key}
-                  style={[styles.segment, active && styles.segmentActive]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setPreferences({ ...preferences, hungerPreference: key });
-                  }}
-                >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {userInterestDeckChips.length > 0 ? (
-          <>
-            <Text style={[styles.controlLabel, { marginTop: spacing.md }]}>Steer this deck</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryChipScroll}
-              keyboardShouldPersistTaps="handled"
-            >
-              {userInterestDeckChips.map(({ key, label }) => {
-                const active = deckCategoryFocus === key;
-                return (
-                  <Pressable
-                    key={key}
-                    style={[styles.categoryChip, active && styles.categoryChipActive]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setDeckCategoryFocus((prev) => (prev === key ? null : key));
-                    }}
-                  >
-                    <Text
-                      style={[styles.categoryChipText, active && styles.categoryChipTextActive]}
-                      numberOfLines={1}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </>
-        ) : null}
-      </View> : null}
-
-      {locationDenied ? (
-        <Pressable
-          style={styles.locationBanner}
-          onPress={() => Linking.openSettings()}
-        >
-          <Text style={styles.locationBannerText}>
-            Enable location for better picks — tap to open Settings
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {loading && suggestions.length === 0 ? (
-        <View style={styles.loadingBlock}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingBlurb}>Reading the room…</Text>
-          <Text style={styles.loadingSub}>Pulling what’s open, what’s on, and what fits you.</Text>
-        </View>
-      ) : error && suggestions.length === 0 ? (
-        <View style={styles.loadingBlock}>
-          <ActivityIndicator size="small" color="#F5F0E8" />
-          <Text style={styles.loadingBlurb}>Finding your moves...</Text>
-          <Pressable
-            hitSlop={12}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              load("full");
-            }}
-          >
-            <Text style={styles.retryLink}>Taking too long? Tap to retry</Text>
-          </Pressable>
-        </View>
-      ) : suggestions.length === 0 ? (
-        <View style={styles.loadingBlock}>
-          {findingMoreDeck ? (
-            <Text style={[styles.loadingSub, { textAlign: "center" }]}>Getting more…</Text>
-          ) : (
-            <>
-              <Text style={styles.errorText}>You’re caught up.</Text>
-              <Text style={styles.loadingSub}>Pull to refresh for a new deck.</Text>
-            </>
-          )}
-        </View>
-      ) : (
-        <>
-          <View style={styles.deckWrap}>
-            <ConciergeSwipeDeck
-              suggestions={suggestions}
-              width={DECK_W}
-              height={DECK_HEIGHT}
-              colors={{
-                accent: colors.accent,
-                text: colors.text,
-                textMuted: colors.textMuted,
-                textInverse: colors.textInverse,
-              }}
-              onSwipeRight={quickCommitSwipeRight}
-              onSwipeLeft={commitSwipeLeft}
-              renderCard={(s, { isTop }) => (
-                <ConciergeHeroCard
-                  suggestion={s}
-                  width={DECK_W}
-                  deckMaxHeight={DECK_HEIGHT}
-                  imageGradientBottomColor={colors.bgCard}
-                  colors={colors}
-                  swipeMode
-                  bookmarkSaved={isTop ? bookmarkSaved : false}
-                  onBookmarkPress={isTop ? () => void onBookmarkToggle() : undefined}
-                  onCardPress={isTop ? openPeekDetail : undefined}
-                  onOpenMaps={(sg) => {
-                    void pushRecentConciergeTitle(sg.title);
-                    openMapsQuery(sg.mapQuery || sg.title);
-                  }}
-                  onOpenTickets={(sg) => {
-                    void pushRecentConciergeTitle(sg.title);
-                    const u = String(sg.ticketUrl || "").trim();
-                    if (u) Linking.openURL(u).catch(() => {});
-                  }}
-                />
-              )}
-            />
-            {showSwipeHint ? (
-              <View pointerEvents="none" style={styles.swipeHint}>
-                <Text style={styles.swipeHintText}>← swipe to skip · swipe to go →</Text>
-              </View>
-            ) : null}
-            <DeckButtons
-              onNah={commitSwipeLeft}
-              onGo={quickCommitSwipeRight}
-              colors={{
-                accent: colors.accent,
-                text: colors.text,
-                textMuted: colors.textMuted,
-                textInverse: colors.textInverse,
-              }}
-            />
-          </View>
-        </>
-      )}
-      {pendingRejection ? (
-        <View style={styles.rejectionRow}>
-          <Text style={styles.rejectionLabel}>Why not?</Text>
+        <View style={styles.energyPillRow}>
           {(
             [
-              { key: "too_far" as SkipReason, label: "Too far" },
-              { key: "too_expensive" as SkipReason, label: "Too expensive" },
-              { key: "not_today" as SkipReason, label: "Not today" },
-              { key: "already_been" as SkipReason, label: "Already been" },
-              { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+              { key: "30min" as const, label: "30 min" },
+              { key: "mid" as const, label: "1–3 hrs" },
+              { key: "allday" as const, label: "No rush" },
             ] as const
-          ).map(({ key, label }) => (
-            <Pressable
-              key={key}
-              style={styles.rejectionChip}
-              onPress={() => {
-                Haptics.selectionAsync();
-                void recordSwipeSkipWithReason(pendingRejection.category, key);
-                if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
-                setPendingRejection(null);
-              }}
-            >
-              <Text style={styles.rejectionChipText}>{label}</Text>
-            </Pressable>
-          ))}
+          ).map(({ key, label }) => {
+            const active = timeBudget === key;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.energyPill, active && styles.energyPillActive]}
+                onPress={() => { Haptics.selectionAsync(); setTimeBudget(key); }}
+              >
+                <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-      ) : null}
-      </>
+
+        {/* Bottom: rejection chips or Nah/I’m going buttons */}
+        {pendingRejection ? (
+          <View style={styles.rejectionRow}>
+            <Text style={styles.rejectionLabel}>Why not?</Text>
+            {(
+              [
+                { key: "too_far" as SkipReason, label: "Too far" },
+                { key: "too_expensive" as SkipReason, label: "Too expensive" },
+                { key: "not_today" as SkipReason, label: "Not today" },
+                { key: "already_been" as SkipReason, label: "Already been" },
+                { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+              ] as const
+            ).map(({ key, label }) => (
+              <Pressable
+                key={key}
+                style={styles.rejectionChip}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  void recordSwipeSkipWithReason(pendingRejection.category, key);
+                  if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
+                  setPendingRejection(null);
+                }}
+              >
+                <Text style={styles.rejectionChipText}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : suggestions.length > 0 ? (
+          <DeckButtons
+            onNah={commitSwipeLeft}
+            onGo={quickCommitSwipeRight}
+            colors={{
+              accent: colors.accent,
+              text: colors.text,
+              textMuted: colors.textMuted,
+              textInverse: colors.textInverse,
+            }}
+          />
+        ) : null}
+      </View>
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.savedListWrap}>
@@ -1056,7 +897,6 @@ export default function HomeScreen() {
         </View>
         </ScrollView>
       )}
-    </ScrollView>
 
     {/* Post-move check-in modal */}
     <Modal
@@ -1330,6 +1170,13 @@ function createStyles(
       fontSize: 12,
       fontWeight: "600",
       color: colors.text,
+    },
+    forYouWrap: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    cardArea: {
+      flex: 1,
     },
     deckWrap: {
       alignItems: "center",

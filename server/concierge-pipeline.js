@@ -1087,7 +1087,23 @@ function normalizeSuggestions(raw) {
   return out;
 }
 
+/**
+ * Race a promise against a deadline. On timeout, returns the fallback value instead of throwing.
+ */
+function withDeadline(promise, ms, fallback) {
+  if (ms <= 0) return Promise.resolve(fallback);
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 export async function runConciergeRecommendations(body) {
+  const pipelineStart = Date.now();
+  const PIPELINE_BUDGET_MS = 12000;
+  const elapsed = () => Date.now() - pipelineStart;
+  const remaining = () => Math.max(0, PIPELINE_BUDGET_MS - elapsed());
+
   const lat = body.lat != null ? Number(body.lat) : null;
   const lng = body.lng != null ? Number(body.lng) : body.lon != null ? Number(body.lon) : null;
   if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -1258,18 +1274,23 @@ export async function runConciergeRecommendations(body) {
   const client = new OpenAI({ apiKey: openaiKey });
   const model = process.env.CONCIERGE_MODEL || "gpt-4o";
 
-  const completion = await client.chat.completions.create({
-    model,
-    temperature: 0.75,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `USER MESSAGE (inject all context as JSON):\n${JSON.stringify(gptUserPayload)}`,
-      },
-    ],
-    response_format: { type: "json_object" },
-  });
+  const gptBudgetMs = Math.min(remaining(), 9000);
+  console.log(`[pipeline] GPT call starting — ${elapsed()}ms elapsed, ${gptBudgetMs}ms budget`);
+  const completion = await client.chat.completions.create(
+    {
+      model,
+      temperature: 0.75,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `USER MESSAGE (inject all context as JSON):\n${JSON.stringify(gptUserPayload)}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+    },
+    { signal: AbortSignal.timeout(gptBudgetMs) }
+  );
 
   const text = completion.choices?.[0]?.message?.content;
   if (!text) throw new Error("Empty model response");
@@ -1331,25 +1352,35 @@ export async function runConciergeRecommendations(body) {
 
   const unsplashKey = getUnsplashKey();
   const seedBase = `${nowIso}-${lat.toFixed(2)}-${lng.toFixed(2)}`;
-  suggestions = await resolveConciergeSuggestionImages({
-    suggestions,
-    ticketmasterRecords,
-    nearbyPlaces,
-    unsplashKey,
-    seedBase,
-    googleApiKey: GOOGLE_KEY && !String(GOOGLE_KEY).includes("your") ? GOOGLE_KEY : "",
-  });
+  console.log(`[pipeline] Image resolution starting — ${elapsed()}ms elapsed, ${remaining()}ms left`);
+  suggestions = await withDeadline(
+    resolveConciergeSuggestionImages({
+      suggestions,
+      ticketmasterRecords,
+      nearbyPlaces,
+      unsplashKey,
+      seedBase,
+      googleApiKey: GOOGLE_KEY && !String(GOOGLE_KEY).includes("your") ? GOOGLE_KEY : "",
+    }),
+    remaining(),
+    suggestions // fallback: return suggestions without images
+  );
 
-  suggestions = await enrichConciergeMovieSuggestions(suggestions, {
-    lat,
-    lng,
-    timeZone,
-    nowIso,
-    areaLabel,
-    energy,
-    userContextLine,
-    nearbyPlaces,
-  });
+  suggestions = await withDeadline(
+    enrichConciergeMovieSuggestions(suggestions, {
+      lat,
+      lng,
+      timeZone,
+      nowIso,
+      areaLabel,
+      energy,
+      userContextLine,
+      nearbyPlaces,
+    }),
+    remaining(),
+    suggestions // fallback: return suggestions without movie enrichment
+  );
+  console.log(`[pipeline] Done — ${elapsed()}ms total`);
 
   suggestions = attachPlaceMeta(suggestions, nearbyPlaces, nowIso);
 

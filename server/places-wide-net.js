@@ -240,19 +240,21 @@ async function searchNearbyOne(googleKey, lat, lng, includedTypes) {
         "places.name,places.displayName,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.formattedAddress,places.types,places.id,places.websiteUri,places.photos",
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(14000),
+    signal: AbortSignal.timeout(8000),
   });
   if (!r.ok) {
     const errText = await r.text().catch(() => "");
-    console.warn(
-      "[places] searchNearby batch failed",
-      r.status,
-      includedTypes.slice(0, 4).join(","),
-      errText.slice(0, 120)
+    console.error(
+      `[places] searchNearby batch FAILED status=${r.status} types=[${includedTypes.join(",")}]`
     );
+    console.error(`[places] error body: ${errText}`);
     return [];
   }
   const data = await r.json();
+  if (data.error) {
+    console.error(`[places] API error in response: ${JSON.stringify(data.error)}`);
+    return [];
+  }
   const places = data.places ?? [];
   return places.map(mapPlaceDoc);
 }
@@ -261,19 +263,16 @@ async function searchNearbyOne(googleKey, lat, lng, includedTypes) {
  * Parallel nearby searches by type batches; dedupe; filter open + rating; top N for model.
  * @param {{ relaxOpenNow?: boolean }} [options] — when true, skip open-now gating (future planning).
  */
-export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options = {}) {
-  const relaxOpenNow = options.relaxOpenNow === true;
-  if (
-    !googleKey ||
-    googleKey === "your_key_here" ||
-    googleKey === "your_google_key_here" ||
-    googleKey.includes("your_")
-  ) {
-    return [];
-  }
-
+async function fetchPlacesWideNetInner(lat, lng, googleKey, interests, relaxOpenNow) {
   let types = collectTypesForInterests(interests);
   if (types.length === 0) types = [...BASELINE_TYPES].filter((t) => ALLOWED_TYPES.has(t));
+
+  // Final safety check: drop any type not in ALLOWED_TYPES before sending to API
+  const invalidTypes = types.filter((t) => !ALLOWED_TYPES.has(t));
+  if (invalidTypes.length > 0) {
+    console.error(`[places] Dropping invalid types before API call: ${invalidTypes.join(",")}`);
+    types = types.filter((t) => ALLOWED_TYPES.has(t));
+  }
 
   const batches = chunk(types, 12);
   console.log("[places] searchNearby request", {
@@ -288,7 +287,10 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options
   });
 
   const results = await Promise.all(
-    batches.map((includedTypes) => searchNearbyOne(googleKey, lat, lng, includedTypes))
+    batches.map((includedTypes) => searchNearbyOne(googleKey, lat, lng, includedTypes).catch((err) => {
+      console.error(`[places] batch threw: ${err?.message || err}`);
+      return [];
+    }))
   );
 
   const byId = new Map();
@@ -343,6 +345,40 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options
   });
 
   return filtered.slice(0, MAX_FOR_GPT);
+}
+
+/**
+ * Public entry point. Wraps the inner fetch with an 8-second overall deadline —
+ * if Places doesn't respond in time, returns [] so the pipeline proceeds with
+ * Ticketmaster results only rather than hanging.
+ * @param {{ relaxOpenNow?: boolean }} [options]
+ */
+export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options = {}) {
+  const relaxOpenNow = options.relaxOpenNow === true;
+  if (
+    !googleKey ||
+    googleKey === "your_key_here" ||
+    googleKey === "your_google_key_here" ||
+    googleKey.includes("your_")
+  ) {
+    return [];
+  }
+
+  const PLACES_TIMEOUT_MS = 8000;
+  const timeoutFallback = new Promise((resolve) =>
+    setTimeout(() => {
+      console.warn("[places] Overall fetchPlacesWideNet timed out after 8s — returning []");
+      resolve([]);
+    }, PLACES_TIMEOUT_MS)
+  );
+
+  return Promise.race([
+    fetchPlacesWideNetInner(lat, lng, googleKey, interests, relaxOpenNow).catch((err) => {
+      console.error(`[places] fetchPlacesWideNetInner threw: ${err?.message || err}`);
+      return [];
+    }),
+    timeoutFallback,
+  ]);
 }
 
 export { collectTypesForInterests, RADIUS_METERS };
