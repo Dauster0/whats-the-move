@@ -276,6 +276,17 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options
   if (types.length === 0) types = [...BASELINE_TYPES].filter((t) => ALLOWED_TYPES.has(t));
 
   const batches = chunk(types, 12);
+  console.log("[places] searchNearby request", {
+    endpoint: "https://places.googleapis.com/v1/places:searchNearby",
+    lat,
+    lng,
+    radius_meters: RADIUS_METERS,
+    rankPreference: "POPULARITY",
+    maxResultCount: 20,
+    type_batches: batches,
+    interests_received: interests,
+  });
+
   const results = await Promise.all(
     batches.map((includedTypes) => searchNearbyOne(googleKey, lat, lng, includedTypes))
   );
@@ -289,6 +300,11 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options
     }
   }
   let merged = [...byId.values()];
+
+  console.log(`[places] raw results — ${merged.length} unique places before filtering`);
+  for (const p of merged) {
+    console.log(`  ${p.name} | rating=${p.rating ?? "?"} | openNow=${p.openNow} | types=${(p.types ?? []).join(",")} | ${p.address}`);
+  }
 
   const openOk = (p) => p.openNow === true;
   const rated = (p, min) => p.rating == null || p.rating >= min;

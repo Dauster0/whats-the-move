@@ -1158,6 +1158,17 @@ export async function runConciergeRecommendations(body) {
   ]);
   let nearbyPlaces = annotatePlacesWithDistance(nearbyPlacesRaw, lat, lng);
   nearbyPlaces = filterPlacesByInterestPolicy(nearbyPlaces, interests);
+
+  console.log(`[pipeline] Google Places → ${nearbyPlacesRaw.length} raw → ${nearbyPlaces.length} after interest filter`);
+  for (const p of nearbyPlaces) {
+    console.log(`  [place] ${p.name} | rating=${p.rating ?? "?"} | openNow=${p.openNow} | dist=${p.distanceMiles != null ? p.distanceMiles.toFixed(2) + "mi" : "?"}`);
+  }
+
+  console.log(`[pipeline] Ticketmaster → ${ticketmasterRecordsRaw.length} raw events`);
+  for (const e of ticketmasterRecordsRaw) {
+    console.log(`  [tm-raw] ${e.name} @ ${e.venue} | ${e.localDate} ${e.localTime ?? ""} | segment=${e.segment}`);
+  }
+
   let ticketmasterRecords = filterTicketmasterUpcomingWindow(ticketmasterRecordsRaw, nowMs, 2)
     .slice()
     .sort((a, b) => (tmRecordStartMs(a) ?? 0) - (tmRecordStartMs(b) ?? 0));
@@ -1169,6 +1180,11 @@ export async function runConciergeRecommendations(body) {
   }));
   // Main deck is "right now" — only show events happening tonight (same calendar day).
   ticketmasterRecords = ticketmasterRecords.filter((r) => r.whenLabel === "Tonight");
+
+  console.log(`[pipeline] Ticketmaster → ${ticketmasterRecords.length} events after tonight filter`);
+  for (const e of ticketmasterRecords) {
+    console.log(`  [tm-tonight] ${e.name} @ ${e.venue} | ${e.localDate} ${e.localTime ?? ""} | whenLabel=${e.whenLabel}`);
+  }
 
   const ticketmasterEvents = ticketmasterRecords.map(
     ({
