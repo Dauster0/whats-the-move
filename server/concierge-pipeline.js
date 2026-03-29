@@ -621,8 +621,8 @@ function filterClosedVenuePlaces(suggestions, nearbyPlaces, planningAhead = fals
  */
 function filterEventsByTimeWindow(suggestions, ticketmasterRecords, nowMs) {
   const byId = new Map(ticketmasterRecords.map((r) => [r.id, r]));
-  const MAX_AHEAD_MS = 90 * 60 * 1000;  // 90 min
-  const MAX_PAST_MS  = 60 * 60 * 1000;  // 60 min
+  const MAX_AHEAD_MS = 4 * 60 * 60 * 1000;  // 4 hours — need time to get ready and travel
+  const MAX_PAST_MS  = 60 * 60 * 1000;       // 60 min — already started but still worth going
   return suggestions.filter((s) => {
     const eventId = String(s.ticketEventId || "").trim();
     if (!eventId) return true; // not a TM event — place or GPT, pass through
