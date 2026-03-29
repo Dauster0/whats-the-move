@@ -194,7 +194,6 @@ export default function HomeScreen() {
 
   const [pendingRejection, setPendingRejection] = useState<{ category: string } | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [filtersVisible, setFiltersVisible] = useState(false);
   const [postMoveCheckIn, setPostMoveCheckIn] = useState<{ title: string; category: string } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
@@ -565,10 +564,6 @@ export default function HomeScreen() {
     return null;
   }
 
-  const energyLabel = energy === "low" ? "Low" : energy === "high" ? "High" : "Mid";
-  const timeLabel = timeBudget === "30min" ? "~30 min" : timeBudget === "allday" ? "No rush" : "1–3 hrs";
-  const hungerPref = preferences.hungerPreference ?? "any";
-  const hungerLabel = hungerPref === "hungry" ? "Hungry" : hungerPref === "not_hungry" ? "Not hungry" : "Either";
 
   return (
     <View style={styles.rootWrap}>
@@ -665,7 +660,7 @@ export default function HomeScreen() {
             <Ionicons
               name="calendar-outline"
               size={16}
-              color={homeTab === "comingUp" ? colors.textInverse : colors.text}
+              color={homeTab === "comingUp" ? "#111111" : "#888888"}
             />
             <Text
               style={[styles.tabText, homeTab === "comingUp" && styles.tabTextActive]}
@@ -698,15 +693,28 @@ export default function HomeScreen() {
         />
       ) : homeTab === "forYou" ? (
       <>
-      {/* Slim filter summary bar */}
-      <Pressable
-        style={styles.filterBar}
-        onPress={() => { Haptics.selectionAsync(); setFiltersVisible((v) => !v); }}
-      >
-        <Text style={styles.filterBarText}>{energyLabel} · {timeLabel} · {hungerLabel}</Text>
-        <Ionicons name={filtersVisible ? "chevron-up" : "chevron-down"} size={12} color={colors.textMuted} />
-      </Pressable>
-      {filtersVisible ? <View style={styles.controlBlock}>
+      {/* Always-visible energy pills */}
+      <View style={styles.energyPillRow}>
+        {(
+          [
+            { key: "low" as const, label: "Low" },
+            { key: "medium" as const, label: "Mid" },
+            { key: "high" as const, label: "High" },
+          ] as const
+        ).map(({ key, label }) => {
+          const active = energy === key;
+          return (
+            <Pressable
+              key={key}
+              style={[styles.energyPill, active && styles.energyPillActive]}
+              onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
+            >
+              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {false ? <View style={styles.controlBlock}>
         <View style={styles.controlFilterRow}>
         <Text style={styles.controlLabel}>Energy</Text>
         <View style={styles.segmentRow}>
@@ -1106,7 +1114,7 @@ function createStyles(
       width: 30,
       height: 30,
       borderRadius: 15,
-      backgroundColor: "#E8A87C",
+      backgroundColor: "#E8935A",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1121,6 +1129,35 @@ function createStyles(
       color: colors.textMuted,
       fontWeight: "500",
       marginTop: 1,
+    },
+    energyPillRow: {
+      flexDirection: "row",
+      gap: 8,
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+    },
+    energyPill: {
+      flex: 1,
+      height: 38,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "#333333",
+      backgroundColor: "#1e1e1e",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    energyPillActive: {
+      backgroundColor: "#ffffff",
+      borderColor: "#ffffff",
+    },
+    energyPillText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: "#888888",
+    },
+    energyPillTextActive: {
+      color: "#111111",
+      fontWeight: "700",
     },
     filterBar: {
       flexDirection: "row",
@@ -1195,26 +1232,27 @@ function createStyles(
     tab: {
       flex: 1,
       minWidth: 0,
-      paddingVertical: 9,
+      height: 38,
       paddingHorizontal: 10,
-      borderRadius: radius.full,
+      borderRadius: 10,
       borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.bgCard,
+      borderColor: "#333333",
+      backgroundColor: "#1e1e1e",
       alignItems: "center",
       justifyContent: "center",
     },
     tabActive: {
-      backgroundColor: colors.accent,
-      borderColor: colors.accent,
+      backgroundColor: "#ffffff",
+      borderColor: "#ffffff",
     },
     tabText: {
       fontSize: 13,
-      fontWeight: "700",
-      color: colors.textSub,
+      fontWeight: "600",
+      color: "#888888",
     },
     tabTextActive: {
-      color: "#1C1916",
+      color: "#111111",
+      fontWeight: "700",
     },
     rejectionRow: {
       flexDirection: "row",
@@ -1307,24 +1345,25 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
-      paddingVertical: 8,
+      height: 38,
       paddingHorizontal: 12,
-      borderRadius: radius.full,
+      borderRadius: 10,
       borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.bgCard,
+      borderColor: "#333333",
+      backgroundColor: "#1e1e1e",
     },
     segmentActive: {
-      backgroundColor: colors.accent + "28",
-      borderColor: colors.accent,
+      backgroundColor: "#ffffff",
+      borderColor: "#ffffff",
     },
     segmentText: {
       fontSize: 13,
       fontWeight: "600",
-      color: colors.textSub,
+      color: "#888888",
     },
     segmentTextActive: {
-      color: colors.accent,
+      color: "#111111",
+      fontWeight: "700",
     },
     categoryChipScroll: {
       flexDirection: "row",

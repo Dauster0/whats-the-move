@@ -94,8 +94,11 @@ function isCampusOrUniversityTheater(name, address) {
 /**
  * Drop Unsplash results whose alt text clearly mismatches the venue type (wrong scene).
  */
-export function getEditorialAltRejectSubstrings({ sourceName = "", mapQuery = "", address = "" }) {
-  const blob = `${sourceName} ${mapQuery} ${address}`.toLowerCase();
+export function getEditorialAltRejectSubstrings({ sourceName = "", mapQuery = "", address = "", title = "" }) {
+  const blob = `${sourceName} ${mapQuery} ${address} ${title}`.toLowerCase();
+  if (/\b(beach|pier|boardwalk|ocean|coast|bay|cove|shore|waterfront|pacific)\b/.test(blob)) {
+    return ["rainforest", "tropical forest", "jungle", "mangrove", "amazon", "canopy", "lush forest"];
+  }
   if (isSymphonyOrMajorConcertVenue(blob)) {
     return [
       "comedy club",
@@ -239,7 +242,12 @@ export function buildEditorialSearchQueries({
     push("fine dining restaurant interior warm lighting aesthetic");
     push("cafe brunch natural light coffee aesthetic cozy");
   }
-  if (cat === "park" || cat.includes("scenic") || cat.includes("trail")) {
+  // Beach / coastal — must come before generic park/scenic to avoid jungle results
+  if (/\b(beach|pier|boardwalk|ocean|coast|bay|cove|shore|waterfront|pacific)\b/.test(name)) {
+    pushPriority("california beach pacific ocean waves sunset golden hour sand");
+    pushPriority("beach boardwalk summer people walking sand warm light");
+    pushPriority("santa monica venice beach california ocean pier");
+  } else if (cat === "park" || cat.includes("scenic") || cat.includes("trail")) {
     push("golden hour park landscape trees peaceful path");
     push("scenic overlook sunset nature hiking");
   }

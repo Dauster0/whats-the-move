@@ -254,7 +254,12 @@ async function resolveImageForSuggestion(suggestion, i, { lookup, nearbyPlaces, 
 
   const isGptKnowledge = String(s.sourceType || "").toLowerCase() === "gpt_knowledge";
   if (isGptKnowledge && unsplashKey) {
-    const q = String(s.unsplashQuery || "").trim();
+    const rawQ = String(s.unsplashQuery || "").trim();
+    const nameBlob = `${s.title || ""} ${rawQ}`.toLowerCase();
+    // Beach/coastal places: override vague GPT queries that pull tropical/jungle images
+    const q = /\b(beach|pier|boardwalk|ocean|coast|bay|cove|shore|waterfront|pacific)\b/.test(nameBlob)
+      ? "california beach pacific ocean waves sunset golden hour sand people"
+      : rawQ;
     const fallbacks = [q || `${s.title} los angeles neighborhood atmosphere`, "city afternoon street life warm light"];
     try {
       const { urls } = await fetchUnsplashEditorial(unsplashKey, fallbacks.filter(Boolean), {

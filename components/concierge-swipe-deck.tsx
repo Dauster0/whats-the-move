@@ -177,11 +177,11 @@ export function DeckButtons({
   return (
     <View style={styles.btnRow}>
       <Pressable
-        style={[styles.nahBtn, { borderColor: colors.textMuted + "35" }]}
+        style={styles.nahBtn}
         onPress={onNah}
         hitSlop={12}
       >
-        <Text style={[styles.nahLabel, { color: colors.textMuted }]}>Nah</Text>
+        <Text style={styles.nahLabel}>Nah</Text>
       </Pressable>
       <Pressable
         style={[styles.goBtn, { backgroundColor: colors.accent }]}
@@ -236,43 +236,33 @@ const styles = StyleSheet.create({
   },
   btnRow: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    gap: 20,
+    gap: 10,
     marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   nahBtn: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 1.5,
+    flex: 1,
+    height: 56,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    gap: 1,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  nahGlyph: {
-    fontSize: 16,
-    fontWeight: "500",
-    lineHeight: 18,
+    backgroundColor: "#2a2a2a",
   },
   nahLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#ffffff",
   },
   goBtn: {
     flex: 1,
-    height: 58,
-    borderRadius: radius.full,
+    height: 56,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
   goLabel: {
     fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.2,
+    fontWeight: "700",
   },
 });

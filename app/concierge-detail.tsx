@@ -771,7 +771,7 @@ export default function ConciergeDetailScreen() {
           <>
             <View style={styles.peekRow}>
               <Pressable
-                style={[styles.peekBtnNah, { borderColor: colors.border, backgroundColor: colors.bgCard }]}
+                style={[styles.peekBtnNah, showFullSkeleton ? { opacity: 0.45 } : null]}
                 disabled={showFullSkeleton}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -779,7 +779,7 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onNah();
                 }}
               >
-                <Text style={[styles.peekBtnNahText, { color: colors.text }]}>Not for me</Text>
+                <Text style={styles.peekBtnNahText}>Not for me</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -794,7 +794,7 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onCommit();
                 }}
               >
-                <Text style={[styles.peekBtnGoText, { color: colors.textInverse }]}>I’m going</Text>
+                <Text style={styles.peekBtnGoText}>I’m going</Text>
               </Pressable>
             </View>
             <Pressable
@@ -823,13 +823,13 @@ export default function ConciergeDetailScreen() {
             disabled={showFullSkeleton}
             onPress={onPrimaryCta}
           >
-            <Text style={[styles.bottomCtaText, { color: colors.textInverse }]}>
+            <Text style={styles.bottomCtaText}>
               {primary?.label || "Get directions"}
             </Text>
             <Ionicons
               name={primary?.action === "tickets" ? "ticket-outline" : "map-outline"}
               size={20}
-              color={colors.textInverse}
+              color="#111111"
             />
           </Pressable>
         )}
@@ -898,9 +898,14 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
     metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.sm },
     metaChip: {
       fontSize: 12,
-      fontWeight: "700",
-      color: colors.textSub,
-      textTransform: "lowercase",
+      fontWeight: "500",
+      color: "#ffffff",
+      backgroundColor: "#222222",
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      overflow: "hidden",
+      lineHeight: 14,
     },
     ageChip: {
       fontSize: 12,
@@ -935,12 +940,13 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
     costValue: { fontSize: font.sizeLg, fontWeight: "800", color: colors.text },
     tmBtn: {
       marginTop: spacing.sm,
-      alignSelf: "flex-start",
-      paddingVertical: 10,
-      paddingHorizontal: 18,
-      borderRadius: radius.sm,
+      alignSelf: "stretch",
+      height: 56,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 14,
     },
-    tmBtnText: { fontWeight: "800", fontSize: font.sizeMd },
+    tmBtnText: { fontWeight: "700", fontSize: font.sizeMd, color: "#111111" },
     sectionTitle: {
       marginTop: spacing.lg,
       fontSize: 13,
@@ -1033,10 +1039,10 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
       alignItems: "center",
       justifyContent: "center",
       gap: 10,
-      paddingVertical: 16,
-      borderRadius: radius.md,
+      height: 56,
+      borderRadius: 14,
     },
-    bottomCtaText: { fontSize: 17, fontWeight: "800" },
+    bottomCtaText: { fontSize: 16, fontWeight: "700", color: "#111111" },
     peekRow: {
       flexDirection: "row",
       gap: 10,
@@ -1046,19 +1052,19 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 16,
-      borderRadius: radius.md,
-      borderWidth: 1,
+      height: 56,
+      borderRadius: 14,
+      backgroundColor: "#2a2a2a",
     },
-    peekBtnNahText: { fontSize: 16, fontWeight: "800" },
+    peekBtnNahText: { fontSize: 16, fontWeight: "600", color: "#ffffff" },
     peekBtnGo: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 16,
-      borderRadius: radius.md,
+      height: 56,
+      borderRadius: 14,
     },
-    peekBtnGoText: { fontSize: 16, fontWeight: "800" },
+    peekBtnGoText: { fontSize: 16, fontWeight: "700", color: "#111111" },
     neverShowBtn: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
     neverShowText: { fontSize: 13, fontWeight: "600" },
     backBtn: { marginTop: spacing.md, padding: 12 },

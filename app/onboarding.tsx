@@ -27,7 +27,7 @@ import { UserPreferences, useMoveStore } from "../store/move-context";
 
 const { width: W, height: H } = Dimensions.get("window");
 
-const PEACH = "#E8A87C";
+const PEACH = "#E8935A";
 const BG = "#111111";
 const CARD = "#1C1C1E";
 const WHITE = "#FFFFFF";
@@ -259,7 +259,7 @@ const sh = StyleSheet.create({
   },
   continueBtn: {
     backgroundColor: PEACH,
-    borderRadius: 16,
+    borderRadius: 14,
     height: 56,
     alignItems: "center",
     justifyContent: "center",
@@ -363,7 +363,7 @@ const sp = StyleSheet.create({
   },
   btn: {
     backgroundColor: PEACH,
-    borderRadius: 16,
+    borderRadius: 14,
     height: 56,
     alignItems: "center",
     justifyContent: "center",

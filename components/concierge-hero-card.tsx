@@ -133,7 +133,8 @@ export function ConciergeHeroCard({
 
   const displayDescription = swipeMode ? truncateToTwoSentences(s.description) : s.description;
 
-  const deckFit = Boolean(swipeMode && deckMaxHeight != null && deckMaxHeight > 0);
+  // Cards always fit their content — no fixed height regardless of deckMaxHeight.
+  const deckFit = false;
 
   const imageBlock = (
     <View style={[styles.imageZone, { height: imageZoneH, backgroundColor: fallbackBg }]}>
@@ -225,9 +226,9 @@ export function ConciergeHeroCard({
         {displayDescription}
       </Text>
 
-      {(s.distanceText || s.cost || s.openUntil) ? (
+      {(s.cost || s.openUntil) ? (
         <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={2}>
-          {[s.distanceText, s.cost, s.openUntil]
+          {[s.cost, s.openUntil]
             .filter((v) => v && !/^varies$/i.test(String(v).trim()))
             .join(" · ")}
         </Text>
@@ -288,14 +289,14 @@ export function ConciergeHeroCard({
             <Ionicons name="open-outline" size={18} color={colors.textInverse} />
           </Pressable>
           <Pressable
-            style={[styles.secondaryBtn, { borderColor: "rgba(255,255,255,0.35)" }]}
+            style={styles.secondaryBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onOpenMaps(s);
             }}
           >
             <Text style={styles.secondaryBtnText}>Directions</Text>
-            <Ionicons name="map-outline" size={17} color="rgba(255,255,255,0.92)" />
+            <Ionicons name="map-outline" size={17} color="#ffffff" />
           </Pressable>
         </View>
       ) : (
@@ -515,6 +516,7 @@ const styles = StyleSheet.create({
   textBodySwipe: {
     borderTopWidth: 0,
     paddingTop: spacing.sm,
+    paddingBottom: 16,
   },
   textPanelFooter: {
     backgroundColor: "#161412",
@@ -620,13 +622,14 @@ const styles = StyleSheet.create({
   },
   tag: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.88)",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: radius.sm,
+    fontWeight: "500",
+    color: "#ffffff",
+    backgroundColor: "#222222",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     overflow: "hidden",
+    lineHeight: 14,
   },
   ctaRow: {
     flexDirection: "row",
@@ -639,8 +642,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: radius.md,
+    height: 56,
+    borderRadius: 14,
   },
   primaryBtnSolo: {
     flex: 0,
@@ -649,7 +652,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   secondaryBtn: {
     flex: 1,
@@ -657,14 +660,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: "#2a2a2a",
   },
   secondaryBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.95)",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#ffffff",
   },
 });
