@@ -321,10 +321,11 @@ export default function HomeScreen() {
     [fetchDeckList]
   );
 
+  // Initial load only — filters are applied when the user taps "Find moves"
   useEffect(() => {
     if (!isLoaded || !hasFinishedOnboarding) return;
     load("full");
-  }, [isLoaded, hasFinishedOnboarding, energy, timeBudget, deckCategoryFocus, load]);
+  }, [isLoaded, hasFinishedOnboarding]);
 
   useFocusEffect(
     useCallback(() => {
@@ -756,6 +757,13 @@ export default function HomeScreen() {
           );
         })}
       </View>
+      <Pressable
+        style={styles.findMovesBtn}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); load("full"); }}
+      >
+        <Text style={styles.findMovesBtnText}>Find moves</Text>
+      </Pressable>
+
       {false ? <View style={styles.controlBlock}>
         <View style={styles.controlFilterRow}>
         <Text style={styles.controlLabel}>Energy</Text>
@@ -1497,6 +1505,20 @@ function createStyles(
       color: colors.textInverse,
       fontWeight: "700",
       fontSize: 15,
+    },
+    findMovesBtn: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+      height: 56,
+      borderRadius: 14,
+      backgroundColor: "#F5F0E8",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    findMovesBtnText: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: "#111111",
     },
     retryLink: {
       marginTop: spacing.md,
