@@ -27,7 +27,7 @@ import { UserPreferences, useMoveStore } from "../store/move-context";
 
 const { width: W, height: H } = Dimensions.get("window");
 
-const PEACH = "#E8935A";
+const PEACH = "#F5F0E8";
 const BG = "#111111";
 const CARD = "#1C1C1E";
 const WHITE = "#FFFFFF";

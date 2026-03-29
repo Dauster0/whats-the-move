@@ -693,13 +693,13 @@ export default function HomeScreen() {
         />
       ) : homeTab === "forYou" ? (
       <>
-      {/* Always-visible energy pills */}
+      {/* Energy filter row */}
       <View style={styles.energyPillRow}>
         {(
           [
-            { key: "low" as const, label: "Low" },
-            { key: "medium" as const, label: "Mid" },
-            { key: "high" as const, label: "High" },
+            { key: "low" as const, label: "Chill" },
+            { key: "medium" as const, label: "Energetic" },
+            { key: "high" as const, label: "Either" },
           ] as const
         ).map(({ key, label }) => {
           const active = energy === key;
@@ -708,6 +708,27 @@ export default function HomeScreen() {
               key={key}
               style={[styles.energyPill, active && styles.energyPillActive]}
               onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
+            >
+              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {/* Time filter row */}
+      <View style={styles.energyPillRow}>
+        {(
+          [
+            { key: "30min" as const, label: "30 min" },
+            { key: "mid" as const, label: "1–3 hrs" },
+            { key: "allday" as const, label: "No rush" },
+          ] as const
+        ).map(({ key, label }) => {
+          const active = timeBudget === key;
+          return (
+            <Pressable
+              key={key}
+              style={[styles.energyPill, active && styles.energyPillActive]}
+              onPress={() => { Haptics.selectionAsync(); setTimeBudget(key); }}
             >
               <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
             </Pressable>
@@ -856,15 +877,16 @@ export default function HomeScreen() {
         </View>
       ) : error && suggestions.length === 0 ? (
         <View style={styles.loadingBlock}>
-          <Text style={styles.errorText}>{error}</Text>
+          <ActivityIndicator size="small" color="#F5F0E8" />
+          <Text style={styles.loadingBlurb}>Finding your moves...</Text>
           <Pressable
-            style={styles.retryBtn}
+            hitSlop={12}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               load("full");
             }}
           >
-            <Text style={styles.retryBtnText}>Try again</Text>
+            <Text style={styles.retryLink}>Taking too long? Tap to retry</Text>
           </Pressable>
         </View>
       ) : suggestions.length === 0 ? (
@@ -1114,7 +1136,7 @@ function createStyles(
       width: 30,
       height: 30,
       borderRadius: 15,
-      backgroundColor: "#E8935A",
+      backgroundColor: "#F5F0E8",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1147,8 +1169,8 @@ function createStyles(
       justifyContent: "center",
     },
     energyPillActive: {
-      backgroundColor: "#ffffff",
-      borderColor: "#ffffff",
+      backgroundColor: "#F5F0E8",
+      borderColor: "#F5F0E8",
     },
     energyPillText: {
       fontSize: 13,
@@ -1242,8 +1264,8 @@ function createStyles(
       justifyContent: "center",
     },
     tabActive: {
-      backgroundColor: "#ffffff",
-      borderColor: "#ffffff",
+      backgroundColor: "#F5F0E8",
+      borderColor: "#F5F0E8",
     },
     tabText: {
       fontSize: 13,
@@ -1353,8 +1375,8 @@ function createStyles(
       backgroundColor: "#1e1e1e",
     },
     segmentActive: {
-      backgroundColor: "#ffffff",
-      borderColor: "#ffffff",
+      backgroundColor: "#F5F0E8",
+      borderColor: "#F5F0E8",
     },
     segmentText: {
       fontSize: 13,
@@ -1454,6 +1476,13 @@ function createStyles(
       color: colors.textInverse,
       fontWeight: "700",
       fontSize: 15,
+    },
+    retryLink: {
+      marginTop: spacing.md,
+      fontSize: 13,
+      fontWeight: "500",
+      color: colors.textMuted,
+      textAlign: "center",
     },
     menuRoot: {
       flex: 1,

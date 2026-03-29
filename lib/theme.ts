@@ -39,9 +39,9 @@ export const colorsDark = {
   textInverse: "#181512",
   textOnDark: "#F5F2EC",
 
-  accent: "#E8935A",
-  accentSoft: "rgba(232, 147, 90, 0.22)",
-  accentWarm: "#F4A87C",
+  accent: "#F5F0E8",
+  accentSoft: "rgba(245, 240, 232, 0.18)",
+  accentWarm: "#F5F0E8",
 
   border: "#2E2A24",
   borderStrong: "#3D3830",
