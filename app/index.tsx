@@ -735,6 +735,27 @@ export default function HomeScreen() {
           );
         })}
       </View>
+      {/* Hunger filter row */}
+      <View style={styles.energyPillRow}>
+        {(
+          [
+            { key: "any" as const, label: "Either" },
+            { key: "hungry" as const, label: "Hungry" },
+            { key: "not_hungry" as const, label: "Not hungry" },
+          ] as const
+        ).map(({ key, label }) => {
+          const active = (preferences.hungerPreference ?? "any") === key;
+          return (
+            <Pressable
+              key={key}
+              style={[styles.energyPill, active && styles.energyPillActive]}
+              onPress={() => { Haptics.selectionAsync(); setPreferences({ ...preferences, hungerPreference: key }); }}
+            >
+              <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       {false ? <View style={styles.controlBlock}>
         <View style={styles.controlFilterRow}>
         <Text style={styles.controlLabel}>Energy</Text>
