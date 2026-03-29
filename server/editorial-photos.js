@@ -6,6 +6,58 @@
 
 const UNSPLASH_SEARCH = "https://api.unsplash.com/search/photos";
 
+// ─── In-memory query cache ────────────────────────────────────────────────────
+// Resets on server restart. Prevents burning the 50 req/hr free-tier limit.
+const _queryCache = new Map(); // query → { photos: RawPhoto[], ts: number }
+const CACHE_TTL_MS = 55 * 60 * 1000; // 55 min (slightly under the 1-hr Unsplash window)
+
+function _cacheGet(query) {
+  const entry = _queryCache.get(query);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) { _queryCache.delete(query); return null; }
+  return entry.photos;
+}
+
+function _cacheSet(query, photos) {
+  _queryCache.set(query, { photos, ts: Date.now() });
+}
+
+// ─── Category fallback images ─────────────────────────────────────────────────
+// Used when Unsplash returns 403 (rate limit). Direct CDN URLs — no API call needed.
+const CATEGORY_FALLBACKS = {
+  food:        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  restaurant:  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  cafe:        "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  coffee:      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  event:       "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  live_music:  "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  concert:     "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  music:       "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  comedy:      "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  sports:      "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  stadium:     "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  bar:         "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  nightlife:   "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  nightclub:   "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  theater:     "https://images.unsplash.com/photo-1507924538820-ede94a04019d?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  theatre:     "https://images.unsplash.com/photo-1507924538820-ede94a04019d?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  cinema:      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  movie:       "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  experience:  "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  outdoors:    "https://images.unsplash.com/photo-1532274402911-5a369e4c4bb5?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  park:        "https://images.unsplash.com/photo-1532274402911-5a369e4c4bb5?w=2400&q=90&fm=jpg&fit=max&auto=format",
+  default:     "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=2400&q=90&fm=jpg&fit=max&auto=format",
+};
+
+function getCategoryFallbackUrl(category) {
+  const c = String(category || "").toLowerCase().replace(/[^a-z_]/g, "_");
+  return (
+    CATEGORY_FALLBACKS[c] ||
+    Object.entries(CATEGORY_FALLBACKS).find(([k]) => c.includes(k))?.[1] ||
+    CATEGORY_FALLBACKS.default
+  );
+}
+
 function hashStringToSeed(s) {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -288,7 +340,7 @@ export function buildEditorialSearchQueries({
 export async function fetchUnsplashEditorial(
   apiKey,
   queries,
-  { maxImages = 8, rejectAltSubstrings = [], seed, minPhotoWidth = 0 } = {}
+  { maxImages = 8, rejectAltSubstrings = [], seed, minPhotoWidth = 0, fallbackCategory = "" } = {}
 ) {
   if (!apiKey || String(apiKey).includes("your_")) {
     return { urls: [], attributions: [] };
@@ -307,40 +359,46 @@ export async function fetchUnsplashEditorial(
   const seen = new Set();
   const urls = [];
   const attributions = [];
+  let rateLimited = false;
 
   for (const query of queries) {
     if (urls.length >= maxImages) break;
     try {
-      const u =
-        `${UNSPLASH_SEARCH}?` +
-        new URLSearchParams({
-          query,
-          per_page: "20",
-          page: String(1 + Math.floor(rng() * 5)),
-          orientation: "landscape",
-          content_filter: "high",
-          order_by: rng() < 0.35 ? "latest" : "relevant",
+      // Check cache before hitting the API
+      let rawPhotos = _cacheGet(query);
+      if (rawPhotos) {
+        console.log("[unsplash] cache hit:", query.slice(0, 50));
+      } else {
+        const u =
+          `${UNSPLASH_SEARCH}?` +
+          new URLSearchParams({
+            query,
+            per_page: "20",
+            page: String(1 + Math.floor(rng() * 5)),
+            orientation: "landscape",
+            content_filter: "high",
+            order_by: rng() < 0.35 ? "latest" : "relevant",
+          });
+        const r = await fetch(u, {
+          headers: { Authorization: `Client-ID ${apiKey}` },
         });
-      const r = await fetch(u, {
-        headers: { Authorization: `Client-ID ${apiKey}` },
-      });
-      if (!r.ok) {
-        let body = "";
-        try {
-          body = (await r.text()).slice(0, 200);
-        } catch {
-          /* ignore */
+        if (r.status === 403) {
+          rateLimited = true;
+          console.warn("[unsplash] rate limited (403) — will use category fallback");
+          break;
         }
-        console.warn(
-          "[unsplash] search failed",
-          r.status,
-          query.slice(0, 40),
-          body || "(no body)"
-        );
-        continue;
+        if (!r.ok) {
+          let body = "";
+          try { body = (await r.text()).slice(0, 200); } catch { /* ignore */ }
+          console.warn("[unsplash] search failed", r.status, query.slice(0, 40), body || "(no body)");
+          continue;
+        }
+        const data = await r.json();
+        rawPhotos = data.results ?? [];
+        _cacheSet(query, rawPhotos);
       }
-      const data = await r.json();
-      const sorted = [...(data.results ?? [])].sort((a, b) => {
+
+      const sorted = [...rawPhotos].sort((a, b) => {
         const aw = (a.width || 0) * (a.height || 0);
         const bw = (b.width || 0) * (b.height || 0);
         return bw - aw;
@@ -369,6 +427,16 @@ export async function fetchUnsplashEditorial(
     } catch {
       /* try next query */
     }
+  }
+
+  // Rate limited with no images — use hardcoded category fallback
+  if (rateLimited && urls.length === 0) {
+    const fallback = getCategoryFallbackUrl(fallbackCategory);
+    console.log("[unsplash] using category fallback:", fallbackCategory, "→", fallback.slice(0, 60));
+    return {
+      urls: [fallback],
+      attributions: [{ name: "Unsplash", profileUrl: "https://unsplash.com" }],
+    };
   }
 
   return { urls, attributions };

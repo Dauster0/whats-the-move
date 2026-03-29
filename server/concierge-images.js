@@ -266,6 +266,7 @@ async function resolveImageForSuggestion(suggestion, i, { lookup, nearbyPlaces, 
         maxImages: 1,
         seed: `${seedBase}-${i}-gk`,
         minPhotoWidth: MIN_PIXEL_WIDTH,
+        fallbackCategory: s.category || "",
       });
       if (urls[0]) {
         photoUrl = urls[0];
@@ -302,6 +303,7 @@ async function resolveImageForSuggestion(suggestion, i, { lookup, nearbyPlaces, 
         maxImages: 1,
         seed: `${seedBase}-${i}-t`,
         minPhotoWidth: MIN_PIXEL_WIDTH,
+        fallbackCategory: s.category || "event",
       });
       if (urls[0]) {
         photoUrl = urls[0];
@@ -333,6 +335,7 @@ async function resolveImageForSuggestion(suggestion, i, { lookup, nearbyPlaces, 
           maxImages: 1,
           seed: `${seedBase}-${i}-p`,
           minPhotoWidth: MIN_PIXEL_WIDTH,
+          fallbackCategory: s.category || "",
         });
         if (urls[0]) {
           photoUrl = urls[0];
