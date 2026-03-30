@@ -365,18 +365,19 @@ export async function fetchPlacesWideNet(lat, lng, googleKey, interests, options
   }
 
   const PLACES_TIMEOUT_MS = 8000;
-  const timeoutFallback = new Promise((resolve) =>
-    setTimeout(() => {
+  let timeoutId;
+  const timeoutFallback = new Promise((resolve) => {
+    timeoutId = setTimeout(() => {
       console.warn("[places] Overall fetchPlacesWideNet timed out after 8s — returning []");
       resolve([]);
-    }, PLACES_TIMEOUT_MS)
-  );
+    }, PLACES_TIMEOUT_MS);
+  });
 
   return Promise.race([
-    fetchPlacesWideNetInner(lat, lng, googleKey, interests, relaxOpenNow).catch((err) => {
-      console.error(`[places] fetchPlacesWideNetInner threw: ${err?.message || err}`);
-      return [];
-    }),
+    fetchPlacesWideNetInner(lat, lng, googleKey, interests, relaxOpenNow).then(
+      (result) => { clearTimeout(timeoutId); return result; },
+      (err) => { clearTimeout(timeoutId); console.error(`[places] fetchPlacesWideNetInner threw: ${err?.message || err}`); return []; }
+    ),
     timeoutFallback,
   ]);
 }

@@ -143,7 +143,7 @@ export function ConciergeSwipeDeck({
 
         return (
           <GestureDetector key={stableKey(s)} gesture={pan}>
-            <Animated.View style={[styles.cardSlot, { zIndex: 10 }, cardStyle]}>
+            <Animated.View style={[styles.cardSlot, styles.topCardShadow, { zIndex: 10 }, cardStyle]}>
               <Animated.View
                 pointerEvents="none"
                 style={[styles.labelOverlay, styles.labelGo, greenStyle]}
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "flex-start",
-    overflow: "hidden",
+    overflow: "visible",
   },
   /** Top-aligned so tall cards aren’t clipped from above (hero image stays visible). */
   cardSlot: {
@@ -264,5 +264,12 @@ const styles = StyleSheet.create({
   goLabel: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  topCardShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

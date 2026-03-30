@@ -193,12 +193,13 @@ export default function HomeScreen() {
   const suggestionsRef = useRef(suggestions);
   suggestionsRef.current = suggestions;
 
-  const [pendingRejection, setPendingRejection] = useState<{ category: string } | null>(null);
-  const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [postMoveCheckIn, setPostMoveCheckIn] = useState<{ title: string; category: string } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipeHintShownRef = useRef(false);
+  const [pendingGo, setPendingGo] = useState<{ suggestion: ConciergeSuggestion } | null>(null);
+  const pendingGoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -403,12 +404,7 @@ export default function HomeScreen() {
     router.push(`/elsewhere-plus?source=${encodeURIComponent(source)}` as Href);
   }, []);
 
-  const quickCommitSwipeRight = useCallback(() => {
-    setShowSwipeHint(false);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const prev = suggestionsRef.current;
-    const s = prev[0];
-    if (!s) return;
+  const commitGo = useCallback((s: ConciergeSuggestion) => {
     void recordDecayCommitted(s);
     void recordSwipeCommit(s.category || "experience");
     void saveCommittedMove(s.title, s.category || "experience");
@@ -424,7 +420,31 @@ export default function HomeScreen() {
       return next;
     });
     setLeftDismissStreak(0);
-  }, [applyNextDeckOrEmpty, openPlusPaywall]);
+  }, [applyNextDeckOrEmpty]);
+
+  const quickCommitSwipeRight = useCallback(() => {
+    setShowSwipeHint(false);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const prev = suggestionsRef.current;
+    const s = prev[0];
+    if (!s) return;
+    // Pop card immediately so the deck advances
+    setSuggestions((latest) => {
+      const top = latest[0];
+      if (!top || top !== s) return latest;
+      const next = latest.slice(1);
+      if (next.length === 0) return applyNextDeckOrEmpty(latest);
+      return next;
+    });
+    setLeftDismissStreak(0);
+    // Show 2s cancel toast before opening the URL
+    if (pendingGoTimerRef.current) clearTimeout(pendingGoTimerRef.current);
+    setPendingGo({ suggestion: s });
+    pendingGoTimerRef.current = setTimeout(() => {
+      setPendingGo(null);
+      commitGo(s);
+    }, 2000);
+  }, [applyNextDeckOrEmpty, commitGo]);
 
   const openPeekDetail = useCallback(() => {
     const stack = suggestionsRef.current;
@@ -507,10 +527,6 @@ export default function HomeScreen() {
       if (next.length === 0) return applyNextDeckOrEmpty(prev);
       return next;
     });
-    // Show rejection reason chips briefly so the app can learn why
-    if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
-    setPendingRejection({ category: skippedCategory });
-    rejectionTimerRef.current = setTimeout(() => setPendingRejection(null), 8000);
     setLeftDismissStreak((st) => {
       const n = st + 1;
       if (n >= 3) {
@@ -768,91 +784,108 @@ export default function HomeScreen() {
                   <Text style={styles.swipeHintText}>← swipe to skip · swipe to go →</Text>
                 </View>
               ) : null}
+              {pendingGo ? (
+                <View style={styles.goToast}>
+                  <Text style={styles.goToastText} numberOfLines={1}>
+                    Opening {pendingGo.suggestion.title}…
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      if (pendingGoTimerRef.current) clearTimeout(pendingGoTimerRef.current);
+                      setPendingGo(null);
+                    }}
+                    hitSlop={12}
+                  >
+                    <Text style={styles.goToastCancel}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
 
-        {/* Filter pills at bottom */}
-        <View style={styles.energyPillRow}>
-          {(
-            [
-              { key: "low" as const, label: "Chill" },
-              { key: "medium" as const, label: "Energetic" },
-              { key: "high" as const, label: "Either" },
-            ] as const
-          ).map(({ key, label }) => {
-            const active = energy === key;
-            return (
-              <Pressable
-                key={key}
-                style={[styles.energyPill, active && styles.energyPillActive]}
-                onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
-              >
-                <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={styles.energyPillRow}>
-          {(
-            [
-              { key: "30min" as const, label: "30 min" },
-              { key: "mid" as const, label: "1–3 hrs" },
-              { key: "allday" as const, label: "No rush" },
-            ] as const
-          ).map(({ key, label }) => {
-            const active = timeBudget === key;
-            return (
-              <Pressable
-                key={key}
-                style={[styles.energyPill, active && styles.energyPillActive]}
-                onPress={() => { Haptics.selectionAsync(); setTimeBudget(key); }}
-              >
-                <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Bottom: rejection chips or Nah/I’m going buttons */}
-        {pendingRejection ? (
-          <View style={styles.rejectionRow}>
-            <Text style={styles.rejectionLabel}>Why not?</Text>
+        {/* Bottom panel: filter pills then Nah / I’m going */}
+        <View style={styles.bottomPanel}>
+          <Text style={styles.filterLabel}>I want something:</Text>
+          <View style={styles.energyPillRow}>
             {(
               [
-                { key: "too_far" as SkipReason, label: "Too far" },
-                { key: "too_expensive" as SkipReason, label: "Too expensive" },
-                { key: "not_today" as SkipReason, label: "Not today" },
-                { key: "already_been" as SkipReason, label: "Already been" },
-                { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+                { key: "low" as const, label: "Chill" },
+                { key: "medium" as const, label: "Energetic" },
+                { key: "high" as const, label: "Either" },
               ] as const
-            ).map(({ key, label }) => (
-              <Pressable
-                key={key}
-                style={styles.rejectionChip}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  void recordSwipeSkipWithReason(pendingRejection.category, key);
-                  if (rejectionTimerRef.current) clearTimeout(rejectionTimerRef.current);
-                  setPendingRejection(null);
-                }}
-              >
-                <Text style={styles.rejectionChipText}>{label}</Text>
-              </Pressable>
-            ))}
+            ).map(({ key, label }) => {
+              const active = energy === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.energyPill, active && styles.energyPillActive]}
+                  onPress={() => { Haptics.selectionAsync(); setEnergy(key); }}
+                >
+                  <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-        ) : suggestions.length > 0 ? (
-          <DeckButtons
-            onNah={commitSwipeLeft}
-            onGo={quickCommitSwipeRight}
-            colors={{
-              accent: colors.accent,
-              text: colors.text,
-              textMuted: colors.textMuted,
-              textInverse: colors.textInverse,
-            }}
-          />
-        ) : null}
+          <View style={styles.energyPillRow}>
+            {(
+              [
+                { key: "30min" as const, label: "30 min" },
+                { key: "mid" as const, label: "1–3 hrs" },
+                { key: "allday" as const, label: "No rush" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = timeBudget === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.energyPill, active && styles.energyPillActive]}
+                  onPress={() => { Haptics.selectionAsync(); setTimeBudget(key); }}
+                >
+                  <Text style={[styles.energyPillText, active && styles.energyPillTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {suggestions.length > 0 ? (
+            <>
+              <DeckButtons
+                onNah={commitSwipeLeft}
+                onGo={quickCommitSwipeRight}
+                colors={{
+                  accent: colors.accent,
+                  text: colors.text,
+                  textMuted: colors.textMuted,
+                  textInverse: colors.textInverse,
+                }}
+              />
+              <View style={styles.rejectionRow}>
+                <Text style={styles.rejectionLabel}>Why not?</Text>
+                {(
+                  [
+                    { key: "too_far" as SkipReason, label: "Too far" },
+                    { key: "too_expensive" as SkipReason, label: "Too expensive" },
+                    { key: "not_today" as SkipReason, label: "Not today" },
+                    { key: "already_been" as SkipReason, label: "Already been" },
+                    { key: "not_my_thing" as SkipReason, label: "Not my thing" },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <Pressable
+                    key={key}
+                    style={styles.rejectionChip}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      const category = suggestions[0]?.category || "experience";
+                      void recordSwipeSkipWithReason(category, key);
+                    }}
+                  >
+                    <Text style={styles.rejectionChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
       </View>
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -884,11 +917,24 @@ export default function HomeScreen() {
                   <Text style={[styles.savedRowTitle, { color: colors.text }]} numberOfLines={2}>
                     {row.suggestion.title}
                   </Text>
-                  {row.suggestion.category ? (
-                    <Text style={[styles.savedRowMeta, { color: colors.textMuted }]}>
-                      {row.suggestion.category}
-                    </Text>
-                  ) : null}
+                  <Text style={[styles.savedRowMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                    {[
+                      row.suggestion.category,
+                      row.suggestion.dateBadge,
+                      row.suggestion.startTime,
+                    ].filter(Boolean).join(" · ")}
+                  </Text>
+                  {(() => {
+                    const iso = row.suggestion.showtimes?.[0]?.startIso;
+                    if (!iso) return null;
+                    const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+                    if (diff <= 0) return null;
+                    return (
+                      <Text style={[styles.savedRowMeta, { color: colors.accent }]}>
+                        {diff === 1 ? "Tomorrow" : `In ${diff} days`}
+                      </Text>
+                    );
+                  })()}
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </Pressable>
@@ -1021,11 +1067,22 @@ function createStyles(
       fontWeight: "500",
       marginTop: 1,
     },
+    bottomPanel: {
+      gap: 8,
+      paddingBottom: 16,
+    },
+    filterLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: colors.textMuted,
+      paddingHorizontal: spacing.md,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
     energyPillRow: {
       flexDirection: "row",
       gap: 8,
       paddingHorizontal: spacing.md,
-      marginBottom: spacing.xs,
     },
     energyPill: {
       flex: 1,
@@ -1308,6 +1365,32 @@ function createStyles(
       paddingVertical: 6,
       borderRadius: radius.full,
       overflow: "hidden" as const,
+    },
+    goToast: {
+      position: "absolute" as const,
+      bottom: 12,
+      left: 16,
+      right: 16,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      backgroundColor: "rgba(20,20,20,0.92)",
+      borderRadius: radius.md,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      zIndex: 30,
+    },
+    goToastText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: "600",
+      color: "#fff",
+      marginRight: 12,
+    },
+    goToastCancel: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: colors.accent,
     },
     cardsScrollContent: {
       alignItems: "stretch",

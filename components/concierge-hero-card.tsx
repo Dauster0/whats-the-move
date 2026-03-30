@@ -138,6 +138,22 @@ export function ConciergeHeroCard({
 
   const imageBlock = (
     <View style={[styles.imageZone, { height: imageZoneH, backgroundColor: fallbackBg }]}>
+      {onBookmarkPress ? (
+        <Pressable
+          style={[styles.bookmarkHit, { backgroundColor: "rgba(0,0,0,0.45)" }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onBookmarkPress();
+          }}
+          hitSlop={12}
+        >
+          <Ionicons
+            name={bookmarkSaved ? "bookmark" : "bookmark-outline"}
+            size={22}
+            color="#fff"
+          />
+        </Pressable>
+      ) : null}
       {showShimmer ? <ShimmerOverlay style={StyleSheet.absoluteFill} /> : null}
 
       {showRemote ? (
@@ -274,7 +290,8 @@ export function ConciergeHeroCard({
     </>
   );
 
-  const footerBlock = (
+  // In swipe mode the footer only shows for movies with showtimes — skip the wrapping View otherwise
+  const footerBlock = swipeMode && !(isMovie && s.showtimes?.length) ? null : (
     <View style={[styles.textPanelFooter, swipeMode && styles.textPanelFooterSwipe]}>
       {swipeMode ? null : ticketed ? (
         <View style={styles.ctaRow}>
@@ -336,22 +353,6 @@ export function ConciergeHeroCard({
         ]}
       >
         <View style={[styles.column, deckFit && styles.columnDeckFit]}>
-          {onBookmarkPress ? (
-            <Pressable
-              style={[styles.bookmarkHit, { backgroundColor: "rgba(0,0,0,0.45)" }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onBookmarkPress();
-              }}
-              hitSlop={12}
-            >
-              <Ionicons
-                name={bookmarkSaved ? "bookmark" : "bookmark-outline"}
-                size={22}
-                color="#fff"
-              />
-            </Pressable>
-          ) : null}
           {deckFit ? (
             <View style={styles.swipeDeckBody}>
               <Pressable
@@ -403,7 +404,7 @@ export function ConciergeHeroCard({
 const styles = StyleSheet.create({
   bookmarkHit: {
     position: "absolute",
-    top: 12,
+    bottom: 12,
     right: 12,
     zIndex: 30,
     width: 42,

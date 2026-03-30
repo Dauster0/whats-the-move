@@ -612,12 +612,20 @@ export default function ConciergeDetailScreen() {
           {detail?.logistics?.duration || suggestion?.timeRequired ? (
             <Text style={styles.logLine}>{detail?.logistics?.duration || suggestion?.timeRequired}</Text>
           ) : null}
-          {detail?.logistics?.distanceText ? (
-            <Text style={styles.logLine}>{detail.logistics.distanceText}</Text>
-          ) : null}
-          {detail?.logistics?.driveTimeText ? (
-            <Text style={styles.logLine}>{detail.logistics.driveTimeText}</Text>
-          ) : null}
+          {(() => {
+            const drive = detail?.logistics?.driveTimeText;
+            const dist = detail?.logistics?.distanceText;
+            if (drive) return <Text style={styles.logLine}>{drive}</Text>;
+            if (dist) {
+              const miles = parseFloat(dist);
+              if (!isNaN(miles)) {
+                const mins = Math.round(miles * 3);
+                return <Text style={styles.logLine}>{dist} · ~{mins} min by car</Text>;
+              }
+              return <Text style={styles.logLine}>{dist}</Text>;
+            }
+            return null;
+          })()}
           {detail?.logistics?.parking ? (
             <Text style={styles.logLine}>{detail.logistics.parking}</Text>
           ) : null}
@@ -779,7 +787,7 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onNah();
                 }}
               >
-                <Text style={styles.peekBtnNahText}>Not for me</Text>
+                <Text style={styles.peekBtnNahText}>Nah</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -794,7 +802,13 @@ export default function ConciergeDetailScreen() {
                   getPeekDetailHandlers()?.onCommit();
                 }}
               >
-                <Text style={styles.peekBtnGoText}>I’m going</Text>
+                <Ionicons name="open-outline" size={16} color="#111" style={{ marginRight: 4 }} />
+                <View style={{ alignItems: "center" }}>
+                  <Text style={styles.peekBtnGoText}>I’m going</Text>
+                  <Text style={styles.peekBtnGoSub}>
+                    {suggestion.ticketUrl ? "Opens Ticketmaster" : "Opens Maps"}
+                  </Text>
+                </View>
               </Pressable>
             </View>
             <Pressable
@@ -1059,12 +1073,15 @@ function createStyles(colors: ReturnType<typeof useThemeColors>, insetBottom: nu
     peekBtnNahText: { fontSize: 16, fontWeight: "600", color: "#ffffff" },
     peekBtnGo: {
       flex: 1,
+      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
+      gap: 4,
       height: 56,
       borderRadius: 14,
     },
     peekBtnGoText: { fontSize: 16, fontWeight: "700", color: "#111111" },
+    peekBtnGoSub: { fontSize: 10, fontWeight: "600", color: "#333333", marginTop: 1 },
     neverShowBtn: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
     neverShowText: { fontSize: 13, fontWeight: "600" },
     backBtn: { marginTop: spacing.md, padding: 12 },

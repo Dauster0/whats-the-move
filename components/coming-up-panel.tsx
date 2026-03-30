@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -169,6 +169,11 @@ export function ComingUpPanel({
 
   const decksRef = useRef(decks);
   decksRef.current = decks;
+
+  // Auto-fetch tonight when panel mounts
+  useEffect(() => {
+    void fetchAhead("tonight");
+  }, []);
 
   const fetchAhead = useCallback(
     async (w: AheadWindowKey, dateYmd?: string) => {
@@ -353,10 +358,16 @@ export function ComingUpPanel({
     return out;
   }, []);
 
+  function formatYmd(ymd: string) {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" })
+      .format(new Date(y, m - 1, d));
+  }
+
   const sections: { key: AheadWindowKey; title: string; subtitle: string }[] = [
     { key: "tonight", title: "Tonight", subtitle: "Later today, not started yet" },
     { key: "weekend", title: "This weekend", subtitle: "Friday through Sunday" },
-    { key: "date", title: "Pick a date", subtitle: pickedYmd },
+    { key: "date", title: "Pick a date", subtitle: formatYmd(pickedYmd) },
     { key: "further", title: "Further out", subtitle: "Roughly 1–90 days ahead" },
   ];
 
@@ -465,7 +476,14 @@ export function ComingUpPanel({
         <View key={sec.key} style={styles.section}>
           <Pressable style={styles.sectionHeader} onPress={() => toggle(sec.key)}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{sec.title}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.sectionTitle}>{sec.title}</Text>
+                {decks[sec.key] && (decks[sec.key]?.length ?? 0) > 0 ? (
+                  <View style={[styles.countBadge, { backgroundColor: colors.accent }]}>
+                    <Text style={styles.countBadgeText}>{decks[sec.key]!.length}</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.sectionSub}>{sec.subtitle}</Text>
             </View>
             <Ionicons
@@ -505,7 +523,7 @@ export function ComingUpPanel({
                   void fetchAhead("date", ymd);
                 }}
               >
-                <Text style={styles.dateRowText}>{ymd}</Text>
+                <Text style={styles.dateRowText}>{formatYmd(ymd)}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -605,5 +623,13 @@ function createStyles(
     dateRowText: { fontSize: 15, color: colors.text, fontWeight: "600" },
     modalClose: { marginTop: spacing.sm, alignItems: "center", padding: spacing.sm },
     modalCloseText: { fontSize: 15, fontWeight: "700", color: colors.accent },
+    countBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 10,
+      minWidth: 20,
+      alignItems: "center" as const,
+    },
+    countBadgeText: { fontSize: 11, fontWeight: "800", color: "#111111" },
   });
 }

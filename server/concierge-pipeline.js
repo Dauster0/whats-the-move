@@ -1100,7 +1100,7 @@ function withDeadline(promise, ms, fallback) {
 
 export async function runConciergeRecommendations(body) {
   const pipelineStart = Date.now();
-  const PIPELINE_BUDGET_MS = 12000;
+  const PIPELINE_BUDGET_MS = 30000;
   const elapsed = () => Date.now() - pipelineStart;
   const remaining = () => Math.max(0, PIPELINE_BUDGET_MS - elapsed());
 
@@ -1271,26 +1271,22 @@ export async function runConciergeRecommendations(body) {
     throw new Error("OPENAI_API_KEY not configured");
   }
 
-  const client = new OpenAI({ apiKey: openaiKey });
+  const client = new OpenAI({ apiKey: openaiKey, timeout: 25000, maxRetries: 0 });
   const model = process.env.CONCIERGE_MODEL || "gpt-4o";
 
-  const gptBudgetMs = Math.min(remaining(), 9000);
-  console.log(`[pipeline] GPT call starting — ${elapsed()}ms elapsed, ${gptBudgetMs}ms budget`);
-  const completion = await client.chat.completions.create(
-    {
-      model,
-      temperature: 0.75,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `USER MESSAGE (inject all context as JSON):\n${JSON.stringify(gptUserPayload)}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-    },
-    { signal: AbortSignal.timeout(gptBudgetMs) }
-  );
+  console.log(`[pipeline] GPT call starting — ${elapsed()}ms elapsed`);
+  const completion = await client.chat.completions.create({
+    model,
+    temperature: 0.75,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `USER MESSAGE (inject all context as JSON):\n${JSON.stringify(gptUserPayload)}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
 
   const text = completion.choices?.[0]?.message?.content;
   if (!text) throw new Error("Empty model response");
@@ -1573,7 +1569,7 @@ export async function runConciergeAheadRecommendations(body) {
   if (!openaiKey || openaiKey.includes("your")) {
     throw new Error("OPENAI_API_KEY not configured");
   }
-  const client = new OpenAI({ apiKey: openaiKey });
+  const client = new OpenAI({ apiKey: openaiKey, timeout: 25000, maxRetries: 0 });
   const model = process.env.CONCIERGE_MODEL || "gpt-4o";
 
   const completion = await client.chat.completions.create({

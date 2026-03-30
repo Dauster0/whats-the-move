@@ -139,8 +139,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   chipActive: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
+    backgroundColor: "#F5F0E8",
+    borderColor: "#F5F0E8",
   },
   chipText: {
     color: colors.text,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   chipTextActive: {
-    color: colors.textInverse,
+    color: "#1C1916",
   },
   countText: {
     marginTop: spacing.md,
