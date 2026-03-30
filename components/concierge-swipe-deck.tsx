@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -7,6 +7,8 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -18,6 +20,13 @@ import { font, radius, spacing } from "../lib/theme";
 const { width: SCREEN_W } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_W * 0.22;
 const ROT_MAX = 10;
+
+// Peek geometry: how far each background card's bottom edge extends below the top card.
+const PEEK_PX = [0, 10, 20] as const; // depth 0 = top card, 1 = first behind, 2 = second behind
+const SCALES = [1, 0.955, 0.91] as const;
+
+/** Module-level flag so the nudge hint only plays once per app session. */
+let nudgePlayed = false;
 
 function stableKey(s: ConciergeSuggestion) {
   return `${s.title}|${s.mapQuery}|${s.ticketEventId || ""}|${s.movieTitle || ""}`;
@@ -54,11 +63,30 @@ export function ConciergeSwipeDeck({
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const nudgeX = useSharedValue(0);
+  const hasNudged = useRef(false);
 
+  // Reset position when the top card changes (after a swipe commits)
   useEffect(() => {
     translateX.value = 0;
     translateY.value = 0;
   }, [top?.title, top?.mapQuery, top?.movieTitle]);
+
+  // One-time nudge hint on first card load
+  useEffect(() => {
+    if (!top || nudgePlayed || hasNudged.current) return;
+    hasNudged.current = true;
+    nudgePlayed = true;
+    // Delay 600ms so the card has rendered, then nudge left→right→center
+    nudgeX.value = withDelay(
+      600,
+      withSequence(
+        withTiming(-12, { duration: 200, easing: Easing.out(Easing.quad) }),
+        withTiming(12, { duration: 300, easing: Easing.inOut(Easing.quad) }),
+        withSpring(0, { damping: 14, stiffness: 160 })
+      )
+    );
+  }, [!!top]);
 
   const pan = Gesture.Pan()
     .onUpdate((e) => {
@@ -89,7 +117,7 @@ export function ConciergeSwipeDeck({
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
+      { translateX: translateX.value + nudgeX.value },
       { translateY: translateY.value },
       {
         rotate: `${interpolate(
@@ -115,14 +143,21 @@ export function ConciergeSwipeDeck({
   }
 
   return (
-    <View style={[styles.wrap, { width, height }]}>
+    // Extra bottom padding so peeking cards aren't clipped by the parent
+    <View style={[styles.wrap, { width, height: height + PEEK_PX[2] }]}>
       {[2, 1, 0].map((depth) => {
         const s = stack[depth];
         if (!s) return null;
         const isTop = depth === 0;
-        const z = 3 - depth;
-        const scale = 1 - depth * 0.045;
-        const translateYB = depth * 11;
+        const z = depth === 0 ? 10 : 3 - depth;
+        const scale = SCALES[depth];
+
+        // translateY so the bottom edge of background card peeks PEEK_PX[depth] below the top card.
+        // React Native scales from the center, so after scaling by `scale`:
+        //   card bottom = height*(1+scale)/2
+        // We want: height*(1+scale)/2 + translateY = height + PEEK_PX[depth]
+        //   translateY = height*(1-scale)/2 + PEEK_PX[depth]
+        const translateYB = depth === 0 ? 0 : Math.round(height * (1 - scale) / 2) + PEEK_PX[depth];
 
         if (!isTop) {
           return (
@@ -148,7 +183,7 @@ export function ConciergeSwipeDeck({
                 pointerEvents="none"
                 style={[styles.labelOverlay, styles.labelGo, greenStyle]}
               >
-                <Text style={[styles.labelText, { color: colors.textInverse }]}>Let’s go</Text>
+                <Text style={[styles.labelText, { color: colors.textInverse }]}>Let's go</Text>
               </Animated.View>
               <Animated.View
                 pointerEvents="none"
@@ -201,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     overflow: "visible",
   },
-  /** Top-aligned so tall cards aren’t clipped from above (hero image stays visible). */
+  /** Top-aligned so tall cards aren't clipped from above (hero image stays visible). */
   cardSlot: {
     position: "absolute",
     left: 0,
@@ -267,9 +302,9 @@ const styles = StyleSheet.create({
   },
   topCardShadow: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
 });

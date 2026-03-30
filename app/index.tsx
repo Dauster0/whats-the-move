@@ -849,16 +849,6 @@ export default function HomeScreen() {
           </View>
           {suggestions.length > 0 ? (
             <>
-              <DeckButtons
-                onNah={commitSwipeLeft}
-                onGo={quickCommitSwipeRight}
-                colors={{
-                  accent: colors.accent,
-                  text: colors.text,
-                  textMuted: colors.textMuted,
-                  textInverse: colors.textInverse,
-                }}
-              />
               <View style={styles.rejectionRow}>
                 <Text style={styles.rejectionLabel}>Why not?</Text>
                 {(
@@ -883,6 +873,16 @@ export default function HomeScreen() {
                   </Pressable>
                 ))}
               </View>
+              <DeckButtons
+                onNah={commitSwipeLeft}
+                onGo={quickCommitSwipeRight}
+                colors={{
+                  accent: colors.accent,
+                  text: colors.text,
+                  textMuted: colors.textMuted,
+                  textInverse: colors.textInverse,
+                }}
+              />
             </>
           ) : null}
         </View>

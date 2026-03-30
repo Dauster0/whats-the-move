@@ -31,6 +31,19 @@ export function getConciergeCardMinHeight(width: number) {
   return imageZoneH + 320;
 }
 
+const PILL_MAX = 16;
+function capPill(text: string): string {
+  const t = String(text || "").trim();
+  return t.length <= PILL_MAX ? t : t.slice(0, PILL_MAX - 1) + "…";
+}
+function formatOpenUntil(raw: string): string {
+  // Strip any leading "Open until " prefix the server may have added
+  const time = raw.replace(/^open until\s*/i, "").trim();
+  if (!time || /^usually/i.test(time)) return "Late night";
+  const candidate = `Until ${time}`;
+  return candidate.length <= PILL_MAX ? candidate : capPill(candidate);
+}
+
 function categoryFallbackBackground(category: string) {
   const c = String(category || "").toLowerCase();
   if (/eat|food|restaurant|coffee|cafe|bakery|bar|drink/.test(c)) return "#3d2918";
@@ -281,12 +294,12 @@ export function ConciergeHeroCard({
       ) : null}
 
       <View style={styles.tagRow}>
-        {s.timeRequired ? <Text style={styles.tag}>{s.timeRequired}</Text> : null}
-        <Text style={styles.tag}>{s.energyLevel}</Text>
+        {s.timeRequired ? <Text style={styles.tag} numberOfLines={1}>{capPill(s.timeRequired)}</Text> : null}
+        <Text style={styles.tag} numberOfLines={1}>{capPill(s.energyLevel)}</Text>
         {s.startTime ? (
-          <Text style={[styles.tag, styles.tagTime]}>{s.startTime}</Text>
+          <Text style={[styles.tag, styles.tagTime]} numberOfLines={1}>{capPill(s.startTime)}</Text>
         ) : s.openUntil && !/^varies$/i.test(s.openUntil.trim()) ? (
-          <Text style={[styles.tag, styles.tagTime]}>Open until {s.openUntil.replace(/^open until /i, "")}</Text>
+          <Text style={[styles.tag, styles.tagTime]} numberOfLines={1}>{formatOpenUntil(s.openUntil)}</Text>
         ) : null}
       </View>
     </>
