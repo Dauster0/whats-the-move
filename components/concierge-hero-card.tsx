@@ -242,11 +242,9 @@ export function ConciergeHeroCard({
         {displayDescription}
       </Text>
 
-      {(s.cost || s.openUntil) ? (
-        <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={2}>
-          {[s.cost, s.openUntil]
-            .filter((v) => v && !/^varies$/i.test(String(v).trim()))
-            .join(" · ")}
+      {s.cost && !/^varies$/i.test(s.cost.trim()) ? (
+        <Text style={[styles.metaLine, { marginTop: 6 }]} numberOfLines={1}>
+          {s.cost}
         </Text>
       ) : null}
 
@@ -285,7 +283,11 @@ export function ConciergeHeroCard({
       <View style={styles.tagRow}>
         {s.timeRequired ? <Text style={styles.tag}>{s.timeRequired}</Text> : null}
         <Text style={styles.tag}>{s.energyLevel}</Text>
-        {s.startTime ? <Text style={styles.tag}>{s.startTime}</Text> : null}
+        {s.startTime ? (
+          <Text style={[styles.tag, styles.tagTime]}>{s.startTime}</Text>
+        ) : s.openUntil && !/^varies$/i.test(s.openUntil.trim()) ? (
+          <Text style={[styles.tag, styles.tagTime]}>Open until {s.openUntil.replace(/^open until /i, "")}</Text>
+        ) : null}
       </View>
     </>
   );
@@ -631,6 +633,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     lineHeight: 14,
+  },
+  tagTime: {
+    backgroundColor: "#2a2118",
+    color: "#F5F0E8",
+    fontWeight: "700",
   },
   ctaRow: {
     flexDirection: "row",

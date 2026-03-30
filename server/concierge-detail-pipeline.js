@@ -513,7 +513,9 @@ export async function runConciergeDetailQuick(body) {
     driveTimeText: driveEta,
     parking: placeholderNarrative.parkingHint || placeMeta?.parkingNote || "",
     weatherLine:
-      weather.tempC != null ? `${Math.round(weather.tempC)}°C nearby · check before you go` : "",
+      weather.tempC != null
+        ? `${Math.round((weather.tempC * 9) / 5 + 32)}°F nearby · check before you go`
+        : "",
     openNow: placeMeta?.opening?.openNow ?? null,
     hoursLine: placeMeta?.opening?.lines || "",
   };
