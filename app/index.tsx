@@ -51,6 +51,11 @@ import {
   type SavedConciergeMove,
 } from "../lib/saved-concierge-storage";
 import {
+  getGoingMoves,
+  type GoingMove,
+} from "../lib/going-moves-storage";
+import { GoingSheet } from "../components/going-sheet";
+import {
   filterSuggestionsByDecay,
   getDecayContextForGpt,
   getDecayExcludedKeys,
@@ -198,8 +203,8 @@ export default function HomeScreen() {
   const [locationDenied, setLocationDenied] = useState(false);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipeHintShownRef = useRef(false);
-  const [pendingGo, setPendingGo] = useState<{ suggestion: ConciergeSuggestion } | null>(null);
-  const pendingGoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [goingSheetSuggestion, setGoingSheetSuggestion] = useState<ConciergeSuggestion | null>(null);
+  const [goingRows, setGoingRows] = useState<GoingMove[]>([]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -332,6 +337,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       void getSavedConciergeMoves().then(setSavedRows);
+      void getGoingMoves().then(setGoingRows);
       const isFirstHomeFocus = !hasHadFocusOnce.current;
       void (async () => {
         /* Plus/trial logic removed */
@@ -404,7 +410,8 @@ export default function HomeScreen() {
     router.push(`/elsewhere-plus?source=${encodeURIComponent(source)}` as Href);
   }, []);
 
-  const commitGo = useCallback((s: ConciergeSuggestion) => {
+  // Called when user confirms "I'm going" in the sheet (card already popped)
+  const handleSheetConfirm = useCallback((s: ConciergeSuggestion) => {
     void recordDecayCommitted(s);
     void recordSwipeCommit(s.category || "experience");
     void saveCommittedMove(s.title, s.category || "experience");
@@ -412,23 +419,21 @@ export default function HomeScreen() {
     const u = String(s.ticketUrl || "").trim();
     if (u) Linking.openURL(u).catch(() => {});
     else openMapsQuery(s.mapQuery || s.title);
-    setSuggestions((latest) => {
-      const top = latest[0];
-      if (!top || top !== s) return latest;
-      const next = latest.slice(1);
-      if (next.length === 0) return applyNextDeckOrEmpty(latest);
-      return next;
-    });
-    setLeftDismissStreak(0);
-  }, [applyNextDeckOrEmpty]);
+    setGoingSheetSuggestion(null);
+  }, []);
+
+  // Called when user taps "Actually, not sure yet" — re-insert the card
+  const handleSheetCancel = useCallback((s: ConciergeSuggestion) => {
+    setSuggestions((prev) => [s, ...prev]);
+    setGoingSheetSuggestion(null);
+  }, []);
 
   const quickCommitSwipeRight = useCallback(() => {
     setShowSwipeHint(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const prev = suggestionsRef.current;
-    const s = prev[0];
+    const s = suggestionsRef.current[0];
     if (!s) return;
-    // Pop card immediately so the deck advances
+    // Pop card immediately so deck advances
     setSuggestions((latest) => {
       const top = latest[0];
       if (!top || top !== s) return latest;
@@ -437,14 +442,9 @@ export default function HomeScreen() {
       return next;
     });
     setLeftDismissStreak(0);
-    // Show 2s cancel toast before opening the URL
-    if (pendingGoTimerRef.current) clearTimeout(pendingGoTimerRef.current);
-    setPendingGo({ suggestion: s });
-    pendingGoTimerRef.current = setTimeout(() => {
-      setPendingGo(null);
-      commitGo(s);
-    }, 2000);
-  }, [applyNextDeckOrEmpty, commitGo]);
+    // Show Going Sheet — commit only when user confirms
+    setGoingSheetSuggestion(s);
+  }, [applyNextDeckOrEmpty]);
 
   const openPeekDetail = useCallback(() => {
     const stack = suggestionsRef.current;
@@ -681,6 +681,7 @@ export default function HomeScreen() {
             Haptics.selectionAsync();
             setHomeTab("saved");
             void getSavedConciergeMoves().then(setSavedRows);
+            void getGoingMoves().then(setGoingRows);
           }}
         >
           <Text style={[styles.tabText, homeTab === "saved" && styles.tabTextActive]}>Saved</Text>
@@ -705,6 +706,14 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         ) : null}
+
+        {/* Right Now button */}
+        <Pressable
+          style={styles.rightNowBtn}
+          onPress={() => { Haptics.selectionAsync(); router.push("/right-now"); }}
+        >
+          <Text style={styles.rightNowBtnText}>What can I do right now? →</Text>
+        </Pressable>
 
         {/* Card area — fills remaining space */}
         <View
@@ -782,22 +791,6 @@ export default function HomeScreen() {
               {showSwipeHint ? (
                 <View pointerEvents="none" style={styles.swipeHint}>
                   <Text style={styles.swipeHintText}>← swipe to skip · swipe to go →</Text>
-                </View>
-              ) : null}
-              {pendingGo ? (
-                <View style={styles.goToast}>
-                  <Text style={styles.goToastText} numberOfLines={1}>
-                    Opening {pendingGo.suggestion.title}…
-                  </Text>
-                  <Pressable
-                    onPress={() => {
-                      if (pendingGoTimerRef.current) clearTimeout(pendingGoTimerRef.current);
-                      setPendingGo(null);
-                    }}
-                    hitSlop={12}
-                  >
-                    <Text style={styles.goToastCancel}>Cancel</Text>
-                  </Pressable>
                 </View>
               ) : null}
             </View>
@@ -890,7 +883,43 @@ export default function HomeScreen() {
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.savedListWrap}>
-          {savedRows.length === 0 ? (
+          {/* Going section */}
+          {goingRows.length > 0 ? (
+            <>
+              <Text style={[styles.savedSectionHeader, { color: colors.text }]}>Going</Text>
+              {goingRows.map((row) => (
+                <Pressable
+                  key={row.id}
+                  style={[styles.savedRow, { borderColor: "#D4A857", backgroundColor: colors.bgCard }]}
+                  onPress={async () => {
+                    await setConciergeDetailPayload({ suggestion: row.suggestion, others: [] });
+                    router.push("/concierge-detail");
+                  }}
+                >
+                  {row.suggestion.photoUrl ? (
+                    <Image
+                      source={{ uri: row.suggestion.photoUrl }}
+                      style={styles.savedThumb}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.savedThumb, { backgroundColor: colors.bgMuted }]} />
+                  )}
+                  <View style={styles.savedRowText}>
+                    <Text style={[styles.savedRowTitle, { color: colors.text }]} numberOfLines={2}>
+                      {row.suggestion.title}
+                    </Text>
+                    <Text style={[styles.savedRowMeta, { color: "#D4A857" }]} numberOfLines={1}>
+                      {[row.suggestion.startTime, row.suggestion.venueName].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={20} color="#D4A857" />
+                </Pressable>
+              ))}
+              <Text style={[styles.savedSectionHeader, { color: colors.text, marginTop: 16 }]}>Saved</Text>
+            </>
+          ) : null}
+          {savedRows.length === 0 && goingRows.length === 0 ? (
             <Text style={[styles.savedEmpty, { color: colors.textMuted }]}>
               Nothing saved yet — tap the bookmark on a card to stash a move for later.
             </Text>
@@ -993,6 +1022,13 @@ export default function HomeScreen() {
         </View>
       </View>
     </Modal>
+    <GoingSheet
+      suggestion={goingSheetSuggestion}
+      onConfirm={handleSheetConfirm}
+      onCancel={() => {
+        if (goingSheetSuggestion) handleSheetCancel(goingSheetSuggestion);
+      }}
+    />
     </View>
   );
 }
@@ -1665,6 +1701,31 @@ function createStyles(
       fontWeight: "600",
       color: colors.textMuted,
       textAlign: "center",
+    },
+    rightNowBtn: {
+      marginHorizontal: spacing.md,
+      marginBottom: 8,
+      paddingVertical: 10,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      backgroundColor: "rgba(212,168,87,0.14)",
+      borderWidth: 1,
+      borderColor: "rgba(212,168,87,0.35)",
+      alignItems: "center",
+    },
+    rightNowBtnText: {
+      fontSize: font.sizeSm,
+      fontWeight: "700",
+      color: "#D4A857",
+      letterSpacing: 0.2,
+    },
+    savedSectionHeader: {
+      fontSize: font.sizeSm,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      marginTop: 4,
     },
   });
 }
